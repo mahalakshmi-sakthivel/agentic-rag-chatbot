@@ -20,6 +20,20 @@
 namespace auth {
 
 /**
+ * @brief Exception thrown when an authorization or authentication check fails.
+ */
+class AuthException : public std::runtime_error {
+public:
+    explicit AuthException(const std::string& msg, const std::string& code = "PERMISSION_DENIED")
+        : std::runtime_error(msg), code_(code) {}
+
+    const std::string& code() const noexcept { return code_; }
+
+private:
+    std::string code_;
+};
+
+/**
  * @brief Describes a resource that authorization checks run against.
  */
 struct ResourceContext {

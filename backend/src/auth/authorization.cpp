@@ -55,15 +55,14 @@ bool Authorization::can_access_resource(const IdentityContext& identity,
 void Authorization::require_permission(const IdentityContext& identity,
                                        const std::string& permission) {
     if (!has_permission(identity, permission)) {
-        throw std::runtime_error("FORBIDDEN: missing permission: " + permission);
+        throw AuthException("FORBIDDEN: missing permission: " + permission, "PERMISSION_DENIED");
     }
 }
 
 void Authorization::require_resource_access(const IdentityContext& identity,
                                             const ResourceContext& resource) {
     if (!can_access_resource(identity, resource)) {
-        throw std::runtime_error("FORBIDDEN: resource access denied for user: " +
-                                 identity.user_id);
+        throw AuthException("FORBIDDEN: resource access denied for user: " + identity.user_id, "PERMISSION_DENIED");
     }
 }
 

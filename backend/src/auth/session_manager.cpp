@@ -41,7 +41,11 @@ namespace {
         std::tm tm{};
         std::istringstream ss(s);
         ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
-        return std::chrono::system_clock::from_time_t(std::mktime(&tm));
+#ifdef _WIN32
+        return std::chrono::system_clock::from_time_t(_mkgmtime(&tm));
+#else
+        return std::chrono::system_clock::from_time_t(timegm(&tm));
+#endif
     }
 } // anonymous namespace
 

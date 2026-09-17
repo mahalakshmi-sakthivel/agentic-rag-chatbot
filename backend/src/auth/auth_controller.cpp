@@ -175,7 +175,11 @@ crow::response AuthController::handle_me(const crow::request& req) {
         resp["user_id"]   = user->user_id;
         resp["email"]     = user->email;
         resp["tenant_id"] = user->tenant_id;
-        resp["roles"]     = user->roles;
+        crow::json::wvalue::list roles_list;
+        for (const auto& r : user->roles) {
+            roles_list.push_back(r);
+        }
+        resp["roles"]     = std::move(roles_list);
         // NOTE: password hash is NEVER included in this response
         return json_response(200, resp);
 
@@ -213,8 +217,8 @@ crow::response AuthController::handle_list_sessions(const crow::request& req) {
         resp["sessions"] = std::move(session_list);
         return json_response(200, resp);
 
-    } catch (const std::runtime_error& e) {
-        return error_response(403, "Forbidden");
+    } catch (const AuthException& e) {
+        return error_response(403, e.what());
     } catch (const std::exception& e) {
         std::cerr << "[auth_controller] list_sessions error: " << e.what() << "\n";
         return error_response(500, "Internal server error");
@@ -245,8 +249,8 @@ crow::response AuthController::handle_delete_session(const crow::request& req,
         resp["message"] = "Session deleted";
         return json_response(200, resp);
 
-    } catch (const std::runtime_error& e) {
-        return error_response(403, "Forbidden");
+    } catch (const AuthException& e) {
+        return error_response(403, e.what());
     } catch (const std::exception& e) {
         std::cerr << "[auth_controller] delete_session error: " << e.what() << "\n";
         return error_response(500, "Internal server error");
@@ -281,7 +285,17 @@ IdentityContext AuthController::extract_identity(const crow::request& req) {
 }
 
 crow::response AuthController::error_response(int status, const std::string& message) {
+    std::string code = "INTERNAL_ERROR";
+    if (status == 400) code = "VALIDATION_ERROR";
+    else if (status == 401) code = "UNAUTHENTICATED";
+    else if (status == 403) code = "PERMISSION_DENIED";
+    else if (status == 404) code = "NOT_FOUND";
+    else if (status == 413) code = "FILE_TOO_LARGE";
+    else if (status == 415) code = "UNSUPPORTED_FILE_TYPE";
+    else if (status == 429) code = "RATE_LIMITED";
+    
     crow::json::wvalue body;
+    body["code"]   = code;
     body["error"]  = message;
     body["status"] = status;
     auto resp = crow::response(status, body.dump());

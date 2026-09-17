@@ -19,6 +19,13 @@ AuthenticationMiddleware::AuthenticationMiddleware(
 
 bool AuthenticationMiddleware::authenticate(crow::request& req,
                                              crow::response& res) const {
+    // ── Step 0: Prevent Header Spoofing ───────────────────────────────────────
+    // Drop any X-Identity-* headers provided by the client so they cannot be spoofed.
+    req.headers.erase("X-Identity-User-Id");
+    req.headers.erase("X-Identity-Tenant-Id");
+    req.headers.erase("X-Identity-Session-Id");
+    req.headers.erase("X-Identity-Roles");
+
     // ── Step 1: Extract Bearer token ─────────────────────────────────────────
     auto token_opt = extract_bearer_token(req);
     if (!token_opt.has_value()) {
@@ -102,6 +109,7 @@ void AuthenticationMiddleware::attach_identity(crow::request& req,
 
 crow::response AuthenticationMiddleware::unauthorized(const std::string& reason) {
     crow::json::wvalue body;
+    body["code"]   = "UNAUTHENTICATED";
     body["error"]  = reason;
     body["status"] = 401;
     auto resp = crow::response(401, body.dump());
