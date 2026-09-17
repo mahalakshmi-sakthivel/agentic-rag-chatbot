@@ -38,8 +38,19 @@ QueryHandlerFn QueryController::queryHandler = stubQueryHandler;
 void QueryController::handle(const drogon::HttpRequestPtr &req,
                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    // Seam for Phase 2 — not enforced yet, just threaded through so the
-    // handler (and eventually Phase 5/6) has an identity to consult.
+    // PHASE 2 INTEGRATION POINT: common::authenticate() is the only call
+    // site that needs to change when real auth lands (see common/identity.h).
+    // Not enforced yet in Phase 1 — identity is threaded through so the
+    // handler (and eventually Phase 5/6) has one to consult. Once Phase 2
+    // populates `authenticated`, uncomment the check below:
+    //
+    //   if (!identity.authenticated) {
+    //       // NOTE: UNAUTHENTICATED isn't in common::ErrorCode yet — Phase 1
+    //       // only owns the 5 codes in error_codes.h. Phase 2 adds it there
+    //       // (Section 18.1) as part of landing this check, not before.
+    //       callback(errorResponse("UNAUTHENTICATED", "Missing or invalid token"));
+    //       return;
+    //   }
     const auto identity = common::authenticate(req);
 
     const nlohmann::json parsed = nlohmann::json::parse(req->body(), nullptr, false);
