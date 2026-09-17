@@ -1,0 +1,158 @@
+[
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "245ad84a-0ee2-5bb7-9952-6a6613a07f5a",
+        "chunk_index": 0,
+        "text": "KPR INSTITUTE OF ENGINEERING AND TECHNOLOGY\n(Autonomous Institution, Affiliated to Anna University, Chennai)\nAvinashi Road, Arasur, Coimbatore - 641 407.\nAssignment – II\n----------------------------------------------------------------------------------------------\nName: Kavisharmitha A M\nRoll no: 25AM049\nSection: A\nSubmitted to: Ms. Harshitha H",
+        "source_location": "page 1",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "4ca7ab8c-437b-56bc-9686-b7c23e4d420e",
+        "chunk_index": 1,
+        "text": "1. Design a Python program for a Student Management System: (2)CO3\n• Use a class Student with attributes name, roll_no, and marks.\n• Create objects for 3 students and display their details.\nclass Student:\n\"\"\"Class to represent a Student with name, roll number, and marks. \"\"\"\ndef __init__(self, name, roll_no, marks):\nself.name = name\nself.roll_no = roll_no\nself.marks = marks\ndef display_details(self):\n\"\"\"Method to display student details. \"\"\"\nprint(f\"Name: {self.name}\")\nprint(f\"Roll Number: {self.roll_no}\")\nprint(f\"Marks: {self.marks}\")\nprint(\"-\" * 20)\n# Creating objects for 3 students\nstudent1 = Student(\"Alice\" , 101, 85)\nstudent2 = Student(\"Bob\" , 102, 92)\nstudent3 = Student(\"Charlie\" , 103, 78)\n# Displaying their details\nprint(\"Student Management System Records:\\n\")\nstudent1.display_details()\nstudent2.display_details()\nstudent3.display_details()",
+        "source_location": "page 2",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "16e26d63-6074-569d-b0c9-d1e01d4972a6",
+        "chunk_index": 2,
+        "text": "2. Implement a Python program using list comprehension and sets:\n(2)CO3\n• Generate a list of numbers from 1 to 20.\n• Extract even numbers and store them in a set.\n• Display the final output.\nnumbers_list = [x for x in range(1, 21)]\neven_numbers_set = {x for x in numbers_list if x % 2 == 0}\nprint(\"Original List:\" , numbers_list)\nprint(\"Even Numbers Set:\" , even_numbers_set)",
+        "source_location": "page 3",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "b4f952f1-eaa2-5c5a-9007-2773a8756cc3",
+        "chunk_index": 3,
+        "text": "3. Develop a Python program to perform file handling operations (2)CO4\n• Write student details into a file.\n• Read and display the stored content.\ndef write_student_details(filename):\nwith open(filename, \"w\") as file:\nn = int(input(\"Enter the number of students: \"))\nfor i in range(n):\nprint(f\"\\nEnter details for Student {i+1}:\")\nroll_no = input(\"Roll No: \")\nname = input(\"Name: \")\nmarks = input(\"Marks: \")\nrecord = f\"{roll_no}, {name}, {marks}\\n\"\nfile.write(record)\nprint(\"\\nStudent details successfully written to the file. \")\nprint(f\"An error occurred while writing: {e}\")\ndef read_student_details(filename):",
+        "source_location": "page 4",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "5a9ca6ad-0172-59e5-8dc0-1022a1145b39",
+        "chunk_index": 4,
+        "text": "print(\"\\n--- Stored Student Details ---\")\nwith open(filename, \"r\") as file:\ncontent = file.read()\nif content:\nprint(content)\nprint(\"The file is empty. \")\nexcept FileNotFoundError:\nprint(\"Error: The file was not found. \")\nprint(f\"An error occurred while reading: {e}\")\nfile_name = \"student_records.txt\"\nwrite_student_details(file_name)\nread_student_details(file_name)",
+        "source_location": "page 5",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "b7d4cee6-e7f5-5391-9ee8-36ef171d47a1",
+        "chunk_index": 5,
+        "text": "4. Implement a Python program to process CSV data: (2)CO4\n• Read employee details from a CSV file.\n• Display name and salary of employees.\nimport csv\nwith open('employees.csv' , 'w' , newline='') as file:\nwriter = csv.writer(file)\nwriter.writerow([\"Name\" , \"Department\" , \"Salary\"])\nwriter.writerow([\"John Doe\" , \"IT\" , \"75000\"])\nwriter.writerow([\"Jane Smith\" , \"HR\" , \"62000\"])\nwith open('employees.csv' , mode='r') as file:\nreader = csv.DictReader(file)\nprint(f\"{'Name':<15} {'Salary':<10}\")\nprint(\"-\" * 25)\nfor row in reader:\nprint(f\"{row['Name']:<15} {row['Salary']:<10}\")",
+        "source_location": "page 6",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "25af3c22-6a40-51fa-a3bd-aa74d932de10",
+        "chunk_index": 6,
+        "text": "5. Design a command-line calculator program: (2)CO4\n• Accept inputs using command line arguments.\n• Perform addition and multiplication.\nimport sys\nif len(sys.argv) != 3:\nprint(\"Usage: python script.py <number1> <number2>\")\nnum1 = float(sys.argv[1])\nnum2 = float(sys.argv[2])\nprint(f\"Addition ({num1}) + ({num2}) = {num1 + num2}\")\nprint(f\"Multiplication ({num1} * {num2}) = {num1 * num2}\")\nexcept ValueError:\nprint(\"Please provide valid numbers as arguments. \")",
+        "source_location": "page 7",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "af18f9c4-a710-5648-ab13-0162e925b500",
+        "chunk_index": 7,
+        "text": "6. Develop a Python program to create a log file system: (2)CO4\n• Store user activities in a file.\n• Retrieve and display the logs.\nimport datetime\ndef log_activity(activity):\n\"\"\"Stores user activities in a log file. \"\"\"\ntimestamp = datetime.datetime.now().strftime(\"%Y-%m-%d%H:%M:%S\")\nwith open(\"system.log\" , \"a\") as file:\nfile.write(f\"[{timestamp}] - {activity}\\n\")\nlog_activity(\"User Admin logged in\")\nlog_activity(\"File 'data.csv' uploaded\")\nprint(\"--- System Logs ---\")\nwith open(\"system.log\" , \"r\") as file:\nprint(file.read())",
+        "source_location": "page 8",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "27bcf6f4-300b-56e1-b0a0-f2fcc2dcfef9",
+        "chunk_index": 8,
+        "text": "7. Develop a Python program using NumPy arrays: (2)CO5\n• Create a 2D array.\n• Perform slicing and display results.\nmatrix = np.array([\n[10, 20, 30, 40],\n[50, 60, 70, 80],\n[90, 100, 110, 120]\n])\nprint(\"Original 2D Array:\\n\" , matrix)\nsliced_matrix = matrix[0:2, 1:3]\nprint(\"\\nSliced Array (Rows 0-1, Cols 1-2):\\n\" , sliced_matrix)",
+        "source_location": "page 9",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "46936864-2e6c-5388-b32c-2144fa9f35c8",
+        "chunk_index": 9,
+        "text": "8. Implement a Python program using Pandas DataFrame: (2)CO5\n• Create a dataset with student marks.\n• Filter students scoring above average.\n'Student': ['Alice' , 'Bob' , 'Charlie' , 'David' , 'Eve'],\n'Marks': [88, 45, 92, 75, 60]\naverage_mark = df['Marks'].mean()\nprint(f\"Class Average: {average_mark}\\n\")\nabove_average_students = df[df['Marks'] > average_mark]\nprint(\"Students Scoring Above Average:\")\nprint(above_average_students)",
+        "source_location": "page 10",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "1e69bfa9-b6fa-5769-9625-4fca0a1a4c40",
+        "chunk_index": 10,
+        "text": "9. Develop a Python program to perform data visualization: (2)CO5\n• Plot a histogram using Matplotlib.\n• Display and interpret the output.\nimport matplotlib.pyplot as plt\nscores = [45, 55, 50, 65, 75, 85, 90, 45, 60, 55, 70, 75, 80, 95]\nbins = [40, 50, 60, 70, 80, 90, 100]\nplt.hist(scores, bins=bins, color='skyblue' , edgecolor='black')\nplt.title(\"Student Score Distribution\")\nplt.xlabel(\"Score Range\")\nplt.ylabel(\"Number of Students\")\nplt.grid(axis='y' , alpha=0.75)\nplt.show()\nprint(\"Interpretation: The histogram shows the distribution of student\nscores. \"\n\"The highest concentration of scores falls in the 50-60 and 70-80 bins, \"\n\"indicating where the majority of the class performed. \")",
+        "source_location": "page 11",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    },
+    {
+        "document_id": "test-document-001",
+        "tenant_id": "test-tenant-001",
+        "chunk_id": "85901337-264d-5c6a-bc25-fc97f9fa72d1",
+        "chunk_index": 11,
+        "text": "10. Design a Python program for data cleaning: (2)CO5\n• Identify missing values in dataset.\n• Replace them with suitable values.\n'Name': ['Karthik' , 'Lakshmi' , 'Murali' , 'Nisha' , 'Om'],\n'Age': [20, np.nan, 21, 22, np.nan],\n'Score': [85, 90, np.nan, 88, 76]\nprint(\"--- Original Dataset with Missing Values ---\")\nprint(df)\nprint(\"\\n--- Missing Values Count ---\")\nprint(df.isnull().sum())\ndf['Age'] = df['Age'].fillna(df['Age'].median())\ndf['Score'] = df['Score'].fillna(df['Score'].mean())\nprint(\"\\n--- Cleaned Dataset ---\")\nprint(df)",
+        "source_location": "page 12",
+        "metadata": {
+            "filename": "sample.pdf",
+            "uploaded_by": "test-user-001",
+            "file_type": "pdf"
+        }
+    }
+]

@@ -1,0 +1,17 @@
+# Python virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Test/generated files
+ingestion_output/
+*.json
+
+# Local test files
+sample.pdf
+test.csv
+test.json
+test.xlsx
