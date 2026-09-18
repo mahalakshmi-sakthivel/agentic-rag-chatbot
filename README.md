@@ -6,12 +6,14 @@ Foundation backend for the Plug-and-Play Agentic RAG Chatbot. Implements
 phases plug into.
 
 **This has been compiled and run end-to-end in a clean Ubuntu 24.04
-container** — full build, 25 unit tests, and a live envelope-content smoke
-test against all three endpoints (see "Verification" at the bottom).
+environment** — full build, 28 unit tests, and a 36-assertion live smoke
+test covering real authentication enforcement. Full dated transcript in
+`BUILD_VERIFICATION.md`.
 
-> **Review-round note:** this revision addresses Team Lead feedback on the
-> first submission — see "Changes in this revision" below for exactly what
-> changed and why, mapped to each review comment.
+> **Review-round note:** this revision addresses Team Lead's second-round
+> feedback — see "Changes in this revision" below, mapped comment-by-comment.
+> One item (P1→P2→P3 integration test) is flagged as blocked, not silently
+> skipped — see that section for why and what's needed to unblock it.
 
 ## 1. Install dependencies
 
@@ -41,10 +43,8 @@ git clone https://github.com/microsoft/vcpkg
 export VCPKG_ROOT=$(pwd)/vcpkg
 ```
 
-`vcpkg.json` now pins a `builtin-baseline` commit, so every machine that
-builds against it resolves the **same** Drogon/nlohmann-json/gtest versions
-— that pin, not "whatever vcpkg's registry has today," is what makes this
-build reproducible across contributors' machines.
+`vcpkg.json` pins a `builtin-baseline` commit, so every machine that builds
+against it resolves the **same** Drogon/nlohmann-json/gtest versions.
 
 ## 2. Configure environment
 
@@ -54,10 +54,13 @@ cp .env.example .env
 export $(grep -v '^#' .env | xargs)   # or use your shell's .env loader
 ```
 
-## 3. Build
+For local testing of the authenticated endpoints, also set:
+```bash
+export AUTH_DEV_BYPASS=true
+```
+See "Authentication" below for exactly what this does and why it's safe.
 
-Using the checked-in presets (recommended — one command, same result on any
-machine):
+## 3. Build
 
 ```bash
 cd backend
@@ -66,9 +69,7 @@ cmake --build --preset apt
 ```
 
 Or the manual equivalent, if you're not using presets:
-
 ```bash
-cd backend
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j"$(nproc)"
@@ -77,43 +78,31 @@ cmake --build . -j"$(nproc)"
 Produces two binaries: `agentic_rag_backend` (the server) and
 `agentic_rag_backend_tests` (GoogleTest suite).
 
-### Why the CMake setup changed this round
+See `BUILD_VERIFICATION.md` for a full dated transcript of this exact
+sequence run from a clean environment, with exact package versions and
+timings — that's what "verify the complete build" means concretely here.
 
-The previous CMakeLists.txt hand-maintained a flat list of `.cpp` files.
-That silently breaks in two ways once other phases land alongside Phase 1:
-a new controller/model file added under `src/api/` without a matching
-CMakeLists.txt edit just doesn't get compiled (no error, it's just missing),
-and once `src/auth/` (Phase 2), `src/ingestion/` (Phase 3), etc. exist per
-`TECHNICAL_CONTRACT.md` Section 23, the root build had no way to know about
-them at all.
+### Why the CMake setup changed (previous review round)
 
-Fixed by:
-- `file(GLOB_RECURSE ... CONFIGURE_DEPENDS)` over `src/api/*.cpp` — the
-  source list is now generated from the folder structure instead of
-  maintained separately from it. CMake automatically reconfigures when a
-  file is added/removed.
-- A sibling-module discovery loop in `CMakeLists.txt` that `add_subdirectory()`s
-  `src/auth/`, `src/ingestion/`, `src/retrieval/`, `src/orchestrator/`,
-  `src/llm/` **if and only if** each already has its own `CMakeLists.txt` —
-  a no-op today (none of those exist yet in this submission), verified by
-  simulating a dummy `src/auth/CMakeLists.txt` locally and confirming the
-  root build picked it up and linked it automatically, then removing the
-  simulation.
-  **Assumption flagged for confirmation:** each sibling phase is expected to
-  expose a library target with the same name as its folder (e.g. `src/auth/`
-  → target `auth`). If Phase 2/3 want a different convention, that's a
-  quick Section 27-style note back to Phase 1, not a rewrite.
-- `CMakePresets.json` (new) so "how do I configure this" isn't a
-  per-developer README paraphrase — `cmake --preset apt` or
-  `cmake --preset vcpkg` is the same command for everyone.
-- `vcpkg.json` now pins `builtin-baseline` to a specific vcpkg commit, so
-  the vcpkg path resolves identical dependency versions on every machine
-  instead of "whatever's newest today."
+The old CMakeLists.txt hand-maintained a flat file list, which silently
+drops new files and had no way to see Phase 2/3 once they land. Fixed with
+`file(GLOB_RECURSE ... CONFIGURE_DEPENDS)` (source list generated from the
+folder, not maintained separately) plus a sibling-module discovery loop
+that auto-links `src/auth/`, `src/ingestion/`, etc. the moment each gets
+its own `CMakeLists.txt` — verified by simulating a dummy `src/auth/`
+module and confirming the root build picked it up automatically, then
+removing the simulation. Added `CMakePresets.json`; pinned `vcpkg.json`'s
+`builtin-baseline`.
+
+**Open assumption, unresolved:** each sibling phase is expected to expose a
+CMake target named after its folder (`src/auth/` → target `auth`). Nobody
+has confirmed this with Yuvan (Phase 2) or Kavisharmitha (Phase 3) yet —
+see "Blocked: P1→P2→P3 integration" below.
 
 ## 4. Run
 
 ```bash
-./build/agentic_rag_backend
+AUTH_DEV_BYPASS=true ./build/agentic_rag_backend
 ```
 
 Starts listening on `BACKEND_PORT` (default `8080`).
@@ -127,32 +116,83 @@ curl http://localhost:8080/v1/health
 ```bash
 cd build
 ./agentic_rag_backend_tests
-# or: ctest --preset apt --output-on-failure
 ```
 
-**25 unit tests** (was 21 — added `test_identity.cpp`) covering request
-validation (Section 8), filename sanitization / path-traversal rejection
-(Section 11), the response envelope + error code mapping (Sections 6 & 9),
-and — new this round — the exact `IdentityContext` JSON shape against
-`TECHNICAL_CONTRACT.md` Section 9.2 (`user_id`, `tenant_id`, `roles`,
-`session_id`), so an accidental field rename breaks CI immediately instead
-of surfacing as a Phase 2→3 integration bug. These are pure unit tests
-against `api/models/*.h` and `common/*.h` — no live server needed, so they
-run in milliseconds and need no network access.
+**28 unit tests**, all passing — request validation (Section 8), filename
+sanitization / path-traversal rejection (Section 11), the response envelope
++ error code mapping (Sections 6 & 9), `IdentityContext`'s exact Section
+9.2 JSON shape, and — new this round — the authentication enforcement
+mechanism itself (`devBypassVerifier` behavior, the `setTokenVerifier`
+override hook Phase 2 will use). Pure unit tests, no live server needed.
 
-### Live endpoint + envelope verification
+### Live endpoint + auth enforcement verification
 
 ```bash
-./build/agentic_rag_backend &        # start the server
-./examples/smoke_test.sh             # run against it
+AUTH_DEV_BYPASS=true ./build/agentic_rag_backend &
+./examples/smoke_test.sh
 ```
 
-**Changed this round:** `smoke_test.sh` used to check HTTP status codes
-only. It now uses `jq` to assert on actual envelope *content* per request —
-`success: true/false`, the exact `error.code` value, `error.details.field`,
-required fields like `query_id`/`document_id` being present, and the
-sanitized filename actually landing in the response. 30 assertions across
-all 3 endpoints + 6 error paths, all passing (see "Verification" below).
+**36/36 assertions passing.** New this round: the script now verifies real
+authentication enforcement, not just validation/error paths — `/v1/query`
+and `/v1/data/upload` correctly return `401 UNAUTHENTICATED` with no token
+or the wrong token, and correctly succeed with a valid dev-bypass token,
+while `/v1/health` stays open with no token at all. Full transcript in
+`BUILD_VERIFICATION.md`.
+
+## Authentication (this round's main change)
+
+**Before:** `authenticate(req)` always returned an empty, unauthenticated
+context, and nothing checked it — protected routes accepted everything.
+Team Lead correctly flagged this as not actually connected.
+
+**Now:** `common/identity.h` implements a real, swappable verification
+mechanism:
+
+- `QueryController` and `UploadController` call `common::authenticate(req)`
+  and **actually reject** the request with `401 UNAUTHENTICATED` when
+  `identity.authenticated` is false. This is real enforcement, not a
+  comment describing future enforcement.
+- The active verifier defaults to `common::devBypassVerifier` — a
+  documented, non-cryptographic placeholder: a request needs
+  `Authorization: Bearer dev-local-only` **and** `AUTH_DEV_BYPASS=true` in
+  the environment to be treated as authenticated. Without the env flag set
+  to `true`, even the correct token is rejected — verified explicitly in
+  `BUILD_VERIFICATION.md` Step 6, since this is the property that makes it
+  safe to leave in the codebase at all (Section 19.1: must be false outside
+  local dev).
+- `common::setTokenVerifier(fn)` is the actual Phase 2 integration point —
+  a real function, not a hypothetical one. Once Phase 2's JWT verification
+  function exists, `main.cpp` has one documented line to add:
+  ```cpp
+  common::setTokenVerifier(auth::verifyJwtBearerToken);
+  ```
+  No controller changes needed.
+
+**What Phase 1 still does not do, and per Section 9.1 must not do: parse
+or cryptographically verify a real JWT.** That's Phase 2's code to write,
+not a rewrite Phase 1 should absorb into its own PR.
+
+## Blocked: P1 → P2 → P3 integration test
+
+Team Lead's fourth item — "after Phase 2 and Phase 3 interfaces are
+connected, test the actual P1 → P2 → P3 flow" — **cannot be done from
+Phase 1's side alone**, and isn't attempted in this revision. Concretely:
+
+- There is no `src/auth/` or `src/ingestion/` code available to build or
+  link against yet. The sibling-module CMake mechanism (above) is ready to
+  pick both up automatically the moment they exist with their own
+  `CMakeLists.txt` — but an empty folder has nothing to connect to.
+- Testing "the actual flow" means running a real request through real
+  Phase 2 auth and real Phase 3 ingestion — which requires their
+  implementations, not simulated stand-ins written under Phase 1's PR.
+
+**What would unblock this immediately:** Yuvan's and Kavisharmitha's branch
+names/commit, so their code can be pulled in locally (not merged into this
+PR — just for integration testing) and wired through
+`common::setTokenVerifier` and the file-storage handoff. Once that's
+available, re-running `BUILD_VERIFICATION.md`'s steps against the combined
+build is straightforward — the seams on Phase 1's side are built and
+tested specifically so that step is mechanical, not a redesign.
 
 ## Project layout
 
@@ -165,19 +205,20 @@ backend/
 │   │   └── router.cpp/.h    # the entire public route surface, in one place
 │   ├── common/               # Team-Lead-controlled shared contracts
 │   │   ├── envelope.h       # success/error response wrapper — use this, never build raw JSON
-│   │   ├── error_codes.h    # the ONLY 5 error codes Phase 1 may emit
-│   │   ├── identity.h       # IdentityContext — SEAM for Phase 2, shape frozen by Section 9.2
-│   │   ├── config.h         # env var loading (AppConfig)
+│   │   ├── error_codes.h    # error codes Phase 1 may emit (now includes UNAUTHENTICATED — see note in that file)
+│   │   ├── identity.h       # IdentityContext + real, swappable auth enforcement
+│   │   ├── config.h         # env var loading (AppConfig), incl. AUTH_DEV_BYPASS
 │   │   └── uuid.h           # UUID v4 generator
 │   ├── auth/, ingestion/, retrieval/, orchestrator/, llm/   # NOT present yet —
-│   │                          reserved per Section 23 for Phases 2/3/4/5/6.
-│   │                          Root CMakeLists.txt picks these up automatically
-│   │                          once each has its own CMakeLists.txt.
-│   └── main.cpp
-├── tests/api/                 # GoogleTest — validation + envelope + identity shape
-├── examples/                   # example payloads + jq-based envelope smoke test
+│   │                          reserved per Section 23. Root CMakeLists.txt
+│   │                          picks these up automatically once each has
+│   │                          its own CMakeLists.txt.
+│   └── main.cpp               # documents the exact Phase 2 wiring line
+├── tests/api/                 # GoogleTest — validation + envelope + identity + auth enforcement
+├── examples/                   # example payloads + jq-based envelope/auth smoke test
 ├── CMakeLists.txt
-├── CMakePresets.json           # NEW — one-command reproducible configure/build/test
+├── CMakePresets.json
+├── BUILD_VERIFICATION.md       # NEW — dated, from-scratch build/test/smoke-test transcript
 └── data/uploads/                # default local storage dir (gitignored)
 ```
 
@@ -185,12 +226,10 @@ backend/
 
 | Seam | Where | Who fills it in |
 |---|---|---|
-| Auth | `common::authenticate()` in `common/identity.h` — always returns an unauthenticated pass-through `IdentityContext` today. Both `QueryController` and `UploadController` call it at the same point and keep the result in scope (not discarded), with a commented-out example of the `401` check ready to uncomment. | Phase 2 |
-| Query handling | `QueryController::queryHandler` (a reassignable `std::function`) — defaults to the Phase 1 stub in `QueryController.cpp` | Phase 5 / Phase 6 |
+| Auth | `common::setTokenVerifier()` in `common/identity.h` — one call in `main.cpp` swaps the placeholder for Phase 2's real verifier | Phase 2 |
+| Query handling | `QueryController::queryHandler` (a reassignable `std::function`) | Phase 5 / Phase 6 |
 | File parsing | Nothing — Phase 1 only writes raw bytes to `FILE_STORAGE_PATH`, keyed by `document_id` | Phase 3 |
 | Sibling build integration | `CMakeLists.txt`'s sibling-module loop — add a `CMakeLists.txt` under `src/<your-phase>/` exposing a target named after your folder | Phase 2 / 3 / 4 / 5 / 6 |
-
-None of these require touching controller signatures — that's the point.
 
 ## IdentityContext (Section 9.2 — shape is frozen)
 
@@ -200,81 +239,39 @@ struct IdentityContext {
     std::string tenant_id;
     std::vector<std::string> roles;
     std::string session_id;
-    bool authenticated = false;  // Phase-1/2 internal only — NOT serialized
+    bool authenticated = false;  // internal only — NOT serialized
 };
 ```
 
-JSON (de)serialization (`to_json`/`from_json`) is provided and matches
-Section 9.2 exactly — `{"user_id", "tenant_id", "roles", "session_id"}`,
-nothing more, nothing less. `authenticated` is deliberately excluded from
-the wire shape; it's internal bookkeeping for "did Phase 2 actually verify
-this," not part of the contract Phase 3 reads. Locked in by
+`to_json`/`from_json` match Section 9.2 exactly. Locked in by
 `tests/api/test_identity.cpp`.
 
-## Endpoints (see PHASE_1_CONTRACT.md Section 7 / TECHNICAL_CONTRACT.md Section 7-8)
+## Endpoints
 
 | Method | Path | Auth | Behavior |
 |---|---|---|---|
 | GET | `/v1/health` | No | Real — status, uptime, version |
-| POST | `/v1/query` | Threaded through, not enforced | Stub — validates request, returns placeholder answer |
-| POST | `/v1/data/upload` | Threaded through, not enforced | Real — receives + stores file, returns metadata |
+| POST | `/v1/query` | **Enforced** (401 if missing/invalid) | Stub — validates request, returns placeholder answer |
+| POST | `/v1/data/upload` | **Enforced** (401 if missing/invalid) | Real — receives + stores file, returns metadata |
 
-Every response — success or error — uses the standard envelope from
-`common/envelope.h`. No endpoint returns a raw JSON body.
-
-**No API fields or routes changed this round** — every field/route matches
-what was already reviewed and matches parent contract Sections 7-8 exactly.
-This revision only touches internals (CMake, `IdentityContext` shape, auth
-seam wiring, test coverage).
+**No API fields or routes changed this round.** `UNAUTHENTICATED` was added
+to the error code list on Team Lead's explicit instruction to connect real
+enforcement — see the provenance note in `common/error_codes.h`.
 
 ## Known open items (per contract Section 31)
 
-- **Max upload size**: defaulted to 50MB (`MAX_UPLOAD_SIZE_MB` in `.env`) —
-  contract lists this as TBD (recommended range 25–50MB). Confirm with the
-  team and update the default in `common/config.h` / `.env.example`.
-- **`/v1/chat` alias**: not registered. Contract Section 7.2/8.1 uses
-  `/v1/query`; Phase 1 follows that. Flag to Phase 8 (UI) so they build
-  against `/v1/query`.
-- **Auth enforcement timing**: `/v1/query` and `/v1/data/upload` are
-  functionally open right now (documented, not silently assumed) — do not
-  point any shared/staging environment at this build before Phase 2 lands
-  real auth.
-- **Sibling-module target naming assumption**: the CMake fix above assumes
-  Phase 2/3/4/5/6 each expose a CMake target named after their `src/`
-  subfolder. Flagged above for confirmation once those phases start.
+- **Max upload size**: defaulted to 50MB — still TBD per contract.
+- **`/v1/chat` alias**: not registered; Phase 1 follows Section 7.2/8.1's `/v1/query`.
+- **Sibling-module target naming assumption**: unconfirmed with Phase 2/3 — see "Blocked" above.
+- **AUTH_DEV_BYPASS discipline**: must stay `false` outside local dev. `main.cpp` logs a warning if it's `true` while `ENVIRONMENT` isn't `development`, but that's a safety net, not a substitute for CI/deploy config discipline.
 
-## Changes in this revision (response to Team Lead review)
+## Changes in this revision (response to Team Lead's second review)
 
 | Review comment | What changed |
 |---|---|
-| CMake paths don't match folder structure / reproducible build | `file(GLOB_RECURSE ... CONFIGURE_DEPENDS)` replaces the hand-maintained source list; added sibling-phase auto-discovery (tested with a simulated `src/auth/` module, then removed); added `CMakePresets.json`; pinned `vcpkg.json`'s `builtin-baseline` |
-| Align `IdentityContext` with contract (`user_id`, `tenant_id`, `roles`, `session_id`) | `common/identity.h` rewritten to match Section 9.2 exactly, with `to_json`/`from_json` and a new locked-in unit test |
-| Clean Phase 2 auth integration point on `/v1/query` and `/v1/data/upload` | Both controllers now call `common::authenticate()` at the same point, keep the result in scope, and carry a commented-out example of the enforcement check Phase 2 will uncomment |
-| Verify actual endpoints + error envelopes with smoke tests | `examples/smoke_test.sh` rewritten to assert on envelope *content* via `jq` (success flag, exact error codes, required fields), not just HTTP status — 30/30 passing against a live server |
-| Don't change agreed API fields/routes without updating the contract | Confirmed: no request/response field or route changed in this revision |
+| Connect the Phase 2 auth integration point; protected routes don't enforce auth | `QueryController`/`UploadController` now actually return 401 when unauthenticated. `common/identity.h` rewritten with a real swappable verifier (`devBypassVerifier` default, `setTokenVerifier` as the one-line Phase 2 hook). `UNAUTHENTICATED` added to `error_codes.h` with a provenance note. Real JWT verification itself is explicitly left to Phase 2 — flagged, not implemented here. |
+| Verify the complete CMake build in a properly configured environment, share setup steps | `BUILD_VERIFICATION.md` (new) — dated, from-scratch transcript: exact OS/compiler/package versions, every command run verbatim from this README, every result captured, including one pre-existing upstream CMake warning explicitly identified as not-ours-to-fix. |
+| Run live endpoint tests for health, query, upload, error responses | `examples/smoke_test.sh` extended — 36 assertions, now including the 401-without-token / 401-wrong-token / 200-with-valid-token cases for both `/v1/query` and `/v1/data/upload`, plus a separate check that the bypass token is rejected when `AUTH_DEV_BYPASS` isn't explicitly `true`. |
+| Test the actual P1→P2→P3 flow after Phase 2/3 are connected | **Blocked, not done** — see "Blocked: P1 → P2 → P3 integration test" above for exactly why and what unblocks it. |
 
-## Verification
-
-This exact codebase was, in this environment:
-
-1. Configured and built via `cmake --preset apt` + GCC 13 against
-   apt-installed Drogon 1.8.7, nlohmann-json 3.11.3, and GoogleTest 1.14 —
-   zero errors.
-2. All **25** unit tests run and passed (`./agentic_rag_backend_tests`).
-3. Sibling-module auto-discovery verified by creating a throwaway
-   `src/auth/CMakeLists.txt` + dummy `.cpp`, confirming the root build
-   configured, linked, and built it automatically, then deleting the
-   simulation (not part of this submission).
-4. The server was started for real and `examples/smoke_test.sh` was run
-   against it end-to-end: **30/30 assertions passed**, covering HTTP status
-   *and* envelope content (`success` flag, exact `error.code` values,
-   `error.details.field`, required response fields, and the sanitized
-   `../../etc/passwd` filename landing correctly as `"passwd"` in the
-   response and on disk).
-
-What wasn't verified here: behavior under the vcpkg toolchain specifically
-(only apt was available in this sandbox — vcpkg's baseline pin is correct
-and resolvable, but a full vcpkg build wasn't run end-to-end here), and the
-200ms-class latency target (meaningless before Phase 4/5/6 exist —
-`/v1/health` responds in low single-digit milliseconds locally, which is
-the benchmark this phase is actually responsible for).
+Full verification transcript: `BUILD_VERIFICATION.md`.
