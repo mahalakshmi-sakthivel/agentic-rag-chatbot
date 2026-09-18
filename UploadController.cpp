@@ -17,11 +17,18 @@ UploadController::UploadController(common::AppConfig config) : config_(std::move
 void UploadController::handle(const drogon::HttpRequestPtr &req,
                                std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    // PHASE 2 INTEGRATION POINT: same call site as QueryController — see
-    // common/identity.h. Not enforced yet in Phase 1; `identity` is kept
-    // (not discarded) so it's already in scope for the 401/403 check and
-    // for stamping tenant_id/user_id on stored files once Phase 2 lands.
-    [[maybe_unused]] const auto identity = common::authenticate(req);
+    // PHASE 2 INTEGRATION POINT: same mechanism as QueryController — see
+    // common/identity.h. Real enforcement below; identity is also kept in
+    // scope for Phase 3 to stamp tenant_id/user_id at ingestion time (not
+    // in Phase 1's response — Section 8.2 doesn't include those fields
+    // here, so they aren't added to this response).
+    const auto identity = common::authenticate(req);
+    if (!identity.authenticated)
+    {
+        callback(errorResponse(common::ErrorCode::UNAUTHENTICATED,
+                                "Missing or invalid authentication token"));
+        return;
+    }
 
     drogon::MultiPartParser parser;
     if (parser.parse(req) != 0)
