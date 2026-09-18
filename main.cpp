@@ -6,6 +6,7 @@
 //
 #include "api/router.h"
 #include "common/config.h"
+#include "common/identity.h"
 
 #include <drogon/drogon.h>
 #include <cstdlib>
@@ -35,7 +36,29 @@ int main()
              << "env=" << config.environment
              << " port=" << config.backendPort
              << " storage=" << config.fileStoragePath
-             << " max_upload_mb=" << (config.maxUploadSizeBytes / (1024 * 1024));
+             << " max_upload_mb=" << (config.maxUploadSizeBytes / (1024 * 1024))
+             << " auth_dev_bypass=" << (config.authDevBypassEnabled ? "true" : "false");
+
+    if (config.authDevBypassEnabled && config.environment != "development")
+    {
+        LOG_WARN << "AUTH_DEV_BYPASS is true in a non-development environment "
+                    "(ENVIRONMENT=" << config.environment << "). This must be "
+                    "false outside local dev (Section 19.1) — fix before deploying.";
+    }
+
+    // ---------------------------------------------------------------------
+    // PHASE 2 INTEGRATION POINT — the actual "connect the wire" step.
+    // Once src/auth/ exists with a real JWT verification function matching
+    // common::TokenVerifierFn, replace common::devBypassVerifier with it
+    // here — this one line is the entire integration, no controller changes
+    // needed:
+    //
+    //   #include "auth/JwtVerifier.h"   // Phase 2's header
+    //   common::setTokenVerifier(auth::verifyJwtBearerToken);
+    //
+    // Until that line is added, every request is checked against the
+    // dev-only bypass verifier documented in common/identity.h.
+    // ---------------------------------------------------------------------
 
     auto &app = drogon::app();
     api::registerRoutes(app, config);
