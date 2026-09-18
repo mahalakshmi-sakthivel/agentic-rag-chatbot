@@ -5,10 +5,23 @@
 // This test exists so an accidental field rename (e.g. userId vs user_id)
 // breaks CI immediately instead of surfacing as a Phase 2→3 integration bug.
 //
+// Also covers this review round's addition: real enforcement via a
+// swappable verifier (devBypassVerifier by default, common::setTokenVerifier
+// as the Phase 2 hook).
+//
 #include "common/identity.h"
 #include <gtest/gtest.h>
+#include <cstdlib>
 
 using common::IdentityContext;
+
+namespace
+{
+// setenv/unsetenv aren't in <cstdlib> on all platforms the same way, but are
+// available on the Linux/glibc target this project builds against.
+void setEnv(const char *name, const char *value) { setenv(name, value, 1); }
+void unsetEnv(const char *name) { unsetenv(name); }
+} // namespace
 
 TEST(IdentityContext, DefaultsToUnauthenticatedEmptyContext)
 {
@@ -60,12 +73,66 @@ TEST(IdentityContext, RoundTripsThroughJson)
     EXPECT_FALSE(identity.authenticated);
 }
 
-TEST(IdentityContext, PassthroughAuthenticateReturnsUnauthenticatedContext)
+// ---------------------------------------------------------------------------
+// devBypassVerifier / real enforcement — new this round.
+// ---------------------------------------------------------------------------
+
+class DevBypassVerifierTest : public ::testing::Test
 {
-    // Phase 1 stub: no request even needs to be well-formed since the body
-    // never inspects it yet. nullptr is safe here because authenticate()
-    // casts req to (void) — this documents that Phase 1 behavior, and will
-    // correctly start failing once Phase 2 actually reads the request.
+protected:
+    void TearDown() override
+    {
+        // Never leak env var state into other tests.
+        unsetEnv("AUTH_DEV_BYPASS");
+    }
+};
+
+TEST_F(DevBypassVerifierTest, RejectsRequestWithNoAuthorizationHeader)
+{
+    setEnv("AUTH_DEV_BYPASS", "true");
+    const auto identity = common::devBypassVerifier(nullptr);
+    EXPECT_FALSE(identity.authenticated);
+}
+
+TEST_F(DevBypassVerifierTest, RejectsBypassTokenWhenFlagDisabled)
+{
+    // AUTH_DEV_BYPASS unset -> defaults to false -> must reject even the
+    // "correct" token. This is the Section 19.1 safety property: the
+    // bypass can't accidentally work outside local dev.
+    unsetEnv("AUTH_DEV_BYPASS");
+    const auto identity = common::devBypassVerifier(nullptr);
+    EXPECT_FALSE(identity.authenticated);
+}
+
+TEST(IdentityContext, SetTokenVerifierOverridesActiveVerifier)
+{
+    // Simulates the exact call Phase 2 will make in main.cpp once its real
+    // JWT verifier exists — confirms the swap mechanism itself works.
+    common::setTokenVerifier([](const drogon::HttpRequestPtr &) {
+        IdentityContext identity;
+        identity.authenticated = true;
+        identity.user_id = "phase2-user";
+        identity.tenant_id = "phase2-tenant";
+        identity.roles = {"admin"};
+        identity.session_id = "phase2-session";
+        return identity;
+    });
+
+    const auto identity = common::authenticate(nullptr);
+    EXPECT_TRUE(identity.authenticated);
+    EXPECT_EQ(identity.user_id, "phase2-user");
+    EXPECT_EQ(identity.roles, (std::vector<std::string>{"admin"}));
+
+    // Restore the default so later tests (and any test run after this one
+    // in the same binary) see Phase 1's normal behavior again.
+    common::setTokenVerifier(common::devBypassVerifier);
+}
+
+TEST(IdentityContext, AuthenticateUsesDevBypassVerifierByDefault)
+{
+    // Guards against a future change accidentally leaving some other
+    // verifier active by default.
+    unsetEnv("AUTH_DEV_BYPASS");
     const auto identity = common::authenticate(nullptr);
     EXPECT_FALSE(identity.authenticated);
 }
