@@ -24,6 +24,12 @@ struct AppConfig
     // confirms a final value.
     std::size_t maxUploadSizeBytes = 50ull * 1024 * 1024;
 
+    // Dev-only auth bypass switch (see common/identity.h). MUST be false in
+    // any shared/staging/production environment (Section 19.1) — this
+    // exists solely so Phase 1's own tests can exercise the authenticated
+    // path before Phase 2's real JWT verifier exists. Defaults to false.
+    bool authDevBypassEnabled = false;
+
     static AppConfig fromEnvironment()
     {
         AppConfig cfg;
@@ -36,10 +42,22 @@ struct AppConfig
         const int maxSizeMb = readInt("MAX_UPLOAD_SIZE_MB", 50);
         cfg.maxUploadSizeBytes = static_cast<std::size_t>(maxSizeMb) * 1024 * 1024;
 
+        cfg.authDevBypassEnabled = readBool("AUTH_DEV_BYPASS", false);
+
         return cfg;
     }
 
 private:
+    static bool readBool(const char *name, bool fallback)
+    {
+        const char *value = std::getenv(name);
+        if (value == nullptr || *value == '\0')
+        {
+            return fallback;
+        }
+        const std::string v(value);
+        return v == "true" || v == "1" || v == "yes";
+    }
     static std::string readString(const char *name, const std::string &fallback)
     {
         const char *value = std::getenv(name);
