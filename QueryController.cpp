@@ -38,20 +38,19 @@ QueryHandlerFn QueryController::queryHandler = stubQueryHandler;
 void QueryController::handle(const drogon::HttpRequestPtr &req,
                               std::function<void(const drogon::HttpResponsePtr &)> &&callback)
 {
-    // PHASE 2 INTEGRATION POINT: common::authenticate() is the only call
-    // site that needs to change when real auth lands (see common/identity.h).
-    // Not enforced yet in Phase 1 — identity is threaded through so the
-    // handler (and eventually Phase 5/6) has one to consult. Once Phase 2
-    // populates `authenticated`, uncomment the check below:
-    //
-    //   if (!identity.authenticated) {
-    //       // NOTE: UNAUTHENTICATED isn't in common::ErrorCode yet — Phase 1
-    //       // only owns the 5 codes in error_codes.h. Phase 2 adds it there
-    //       // (Section 18.1) as part of landing this check, not before.
-    //       callback(errorResponse("UNAUTHENTICATED", "Missing or invalid token"));
-    //       return;
-    //   }
+    // PHASE 2 INTEGRATION POINT: common::authenticate() delegates to a
+    // swappable verifier (see common/identity.h). Real enforcement below —
+    // this is no longer a no-op. Today's default verifier is a documented
+    // dev-only placeholder, NOT real JWT verification; Phase 2 swaps in the
+    // real one via common::setTokenVerifier() at startup, with zero changes
+    // needed here.
     const auto identity = common::authenticate(req);
+    if (!identity.authenticated)
+    {
+        callback(errorResponse(common::ErrorCode::UNAUTHENTICATED,
+                                "Missing or invalid authentication token"));
+        return;
+    }
 
     const nlohmann::json parsed = nlohmann::json::parse(req->body(), nullptr, false);
     if (parsed.is_discarded())
