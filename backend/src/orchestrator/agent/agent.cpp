@@ -28,19 +28,20 @@ OrchestratorContext Agent::process_query(
     
     Executor executor(registry_);
     
-    // Execution Loop
+    // Execution Loop with Refinement
     while (state.current_step < state.plan.size()) {
         bool success = executor.execute_step(state);
-        if (!success) {
-            // Check if we hit limits or errors
-            break;
+        
+        // If execution finishes current plan, evaluate
+        if (state.current_step >= state.plan.size()) {
+            if (!evaluator_.is_sufficient(state)) {
+                bool refined = query_refiner_.refine(state);
+                if (!refined) {
+                    state.needs_clarification = true;
+                    break;
+                }
+            }
         }
-    }
-
-    if (!evaluator_.is_sufficient(state)) {
-        // Query refinement logic goes here in a real implementation
-        // For now we just mark as needing clarification
-        state.needs_clarification = true;
     }
 
     return context_builder_.build(state);

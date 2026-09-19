@@ -8,6 +8,7 @@
 #include "planner.h"
 #include "executor.h"
 #include "evaluator.h"
+#include "query_refiner.h"
 #include "../context/context_builder.h"
 
 namespace orchestrator {
@@ -26,6 +27,7 @@ private:
     IntentDetector intent_detector_;
     Planner planner_;
     Evaluator evaluator_;
+    QueryRefiner query_refiner_;
     ContextBuilder context_builder_;
 };
 

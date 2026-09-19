@@ -114,3 +114,49 @@ TEST(ContextBuilderTest, PreservesSources) {
     EXPECT_TRUE(j.contains("retrieved_chunks"));
     EXPECT_TRUE(j.contains("steps_taken"));
 }
+
+TEST(QueryRefinerTest, RefinesQueryCorrectly) {
+    AgentState state;
+    state.retrieval_attempts = 1;
+    state.normalized_query = "revenue";
+    state.intent = IntentType::DOCUMENT_LOOKUP;
+    state.plan = {{1, "vector_search", "Search"}};
+    
+    // Need at least one tool result to allow refinement
+    ToolResult tr;
+    tr.tool_name = "vector_search";
+    tr.status = "success";
+    state.tool_results.push_back(tr);
+
+    QueryRefiner refiner;
+    bool refined = refiner.refine(state);
+    
+    EXPECT_TRUE(refined);
+    EXPECT_EQ(state.normalized_query, "Q3 total revenue 2025");
+    EXPECT_EQ(state.plan.size(), 2);
+    EXPECT_EQ(state.plan[1].action, "vector_search");
+}
+
+TEST(AgentTest, EndToEndExecution) {
+    auto registry = std::make_shared<ToolRegistry>();
+    registry->register_tool(std::make_shared<VectorSearchTool>());
+    registry->register_tool(std::make_shared<StructuredQueryTool>());
+    registry->register_tool(std::make_shared<CalculatorTool>());
+
+    Agent agent(registry);
+    common::IdentityContext id;
+    id.tenant_id = "t-1";
+    
+    auto ctx = agent.process_query("What was the highest monthly revenue?", id, "q-1");
+    EXPECT_EQ(ctx.query_id, "q-1");
+    // Should route to structured_query
+    ASSERT_EQ(ctx.steps_taken.size(), 1);
+    EXPECT_EQ(ctx.steps_taken[0].tool, "structured_query");
+    
+    auto ctx2 = agent.process_query("What was the revenue?", id, "q-2");
+    EXPECT_TRUE(ctx2.needs_clarification);
+    
+    auto ctx3 = agent.process_query("Calculate 15% of 800.", id, "q-3");
+    ASSERT_EQ(ctx3.steps_taken.size(), 1);
+    EXPECT_EQ(ctx3.steps_taken[0].tool, "calculator");
+}

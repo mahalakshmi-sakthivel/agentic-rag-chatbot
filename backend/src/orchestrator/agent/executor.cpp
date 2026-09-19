@@ -19,6 +19,7 @@ bool Executor::execute_step(AgentState& state) {
             {"message", "Maximum agent execution limit reached."}
         };
         state.tool_results.push_back(limit_err);
+        state.current_step++;
         return false;
     }
 
