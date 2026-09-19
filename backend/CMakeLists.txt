@@ -83,8 +83,9 @@ if(BUILD_TESTS)
     enable_testing()
     find_package(GTest CONFIG REQUIRED)
 
-    file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
+    file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/api/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/orchestrator/*.cpp
     )
 
     add_executable(agentic_rag_backend_tests ${TEST_SOURCES})
@@ -94,6 +95,7 @@ if(BUILD_TESTS)
         GTest::gtest_main
         nlohmann_json::nlohmann_json
         Drogon::Drogon   # common/identity.h includes drogon/HttpRequest.h
+        orchestrator
     )
 
     include(GoogleTest)
