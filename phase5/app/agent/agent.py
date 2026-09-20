@@ -119,3 +119,10 @@ class Agent:
             return finalize(FailureResponse(error_code=e.code, message=e.message, query_id=query_id))
         except Exception as e:
             return finalize(FailureResponse(error_code=ErrorCode.INTERNAL_ERROR, message="Unexpected agent error.", query_id=query_id))
+
+def main():
+    print("Phase 5 Agentic RAG Orchestrator initialized.")
+    # In production, this would wire to a FastAPI endpoint, queue listener, etc.
+    
+if __name__ == "__main__":
+    main()
