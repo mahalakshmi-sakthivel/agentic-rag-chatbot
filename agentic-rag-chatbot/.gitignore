@@ -1,0 +1,18 @@
+# Git
+.git
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+venv/
+env/
+.env
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
