@@ -64,3 +64,7 @@ def get_config() -> Config:
     if _config is None:
         _config = Config()
     return _config
+
+def clear_config():
+    global _config
+    _config = None

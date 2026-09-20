@@ -35,7 +35,7 @@ class Planner:
             return [
                 PlanStep(description="Step 1 data retrieval", tool="structured_query", tool_input={"query": query}),
                 PlanStep(description="Step 2 data retrieval", tool="structured_query", tool_input={"query": query}),
-                PlanStep(description="Calculate comparison", tool="calculator", tool_input={"expression": ""})
+                PlanStep(description="Calculate comparison", tool="calculator", tool_input={"expression": "0"})
             ]
         elif intent == Intent.CLARIFICATION_REQUIRED:
             return []
