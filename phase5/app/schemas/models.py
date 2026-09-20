@@ -57,6 +57,11 @@ class Step(BaseModel):
     tool: str
     result_summary: str
 
+class PlanStep(BaseModel):
+    description: str
+    tool: str
+    tool_input: Dict[str, Any]
+
 class OrchestratorContext(BaseModel):
     model_config = ConfigDict(extra='forbid')
     query_id: str
