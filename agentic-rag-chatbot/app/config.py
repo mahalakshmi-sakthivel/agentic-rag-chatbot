@@ -26,13 +26,18 @@ def get_env_bool(key: str, default: bool) -> bool:
     return str(val).lower() in ("1", "true", "yes")
 
 class Config:
+    # Phase 4 Handoff
+    PHASE4_BASE_URL: str = os.getenv("PHASE4_BASE_URL", "http://localhost:8004")
+    
     # Phase 6 Handoff
     PHASE6_BASE_URL: str = os.getenv("PHASE6_BASE_URL", "http://localhost:8006") # Not strictly required by default but fail if None? Spec says "fail clearly if a required one is missing".
     INTERNAL_SERVICE_TOKEN: str = os.getenv("INTERNAL_SERVICE_TOKEN", "")
     
     def __init__(self):
         # We will initialize in a method to allow lazy loading or test overriding, but let's just do it directly.
-        self.PHASE6_BASE_URL = get_env_or_fail("PHASE6_BASE_URL")
+        self.PHASE4_BASE_URL = get_env_or_fail("PHASE4_BASE_URL") if os.getenv("PHASE4_BASE_URL") else "http://localhost:8004"
+        self.PHASE4_TIMEOUT_MS = get_env_int("PHASE4_TIMEOUT_MS", 5000)
+        self.PHASE6_BASE_URL = get_env_or_fail("PHASE6_BASE_URL") if os.getenv("PHASE6_BASE_URL") else "http://localhost:8006"
         self.INTERNAL_SERVICE_TOKEN = get_env_or_fail("INTERNAL_SERVICE_TOKEN")
         self.PHASE6_TIMEOUT_MS = get_env_int("PHASE6_TIMEOUT_MS", 10000)
         self.PHASE6_MAX_RETRIES = get_env_int("PHASE6_MAX_RETRIES", 1)

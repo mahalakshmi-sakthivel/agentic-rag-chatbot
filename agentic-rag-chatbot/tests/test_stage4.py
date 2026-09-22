@@ -87,20 +87,41 @@ def test_scenario_3_calculation(monkeypatch):
     assert state.tool_results_list[0]["output"]["result"] == 120.0
 
 def test_scenario_4_multi_step(monkeypatch):
-    """Spec 27: Scenario 4 — Multi-step"""
+    """Spec P0.3: Multi-step calculation correctness test."""
     monkeypatch.setenv("PHASE6_BASE_URL", "http://localhost:8006")
     monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", "secret-token")
 
-    registry = setup_registry()
+    registry = ToolRegistry()
+    registry.register(CalculatorTool())
+    
+    class NumericMockBackend:
+        def execute_query(self, query: str, identity: Identity):
+            if "Q2" in query:
+                return {"value": 1000}
+            return {"value": 1500}
+            
+    registry.register(StructuredQueryTool(NumericMockBackend()))
+    registry.register(VectorSearchTool(MockPhase4Client()))
+
     query = "Compare the revenue of Q2 and Q3 and calculate the growth percentage."
     state = get_base_state(query)
     
-    plan = Planner().create_plan(state.intent, query)
+    # We construct a custom plan that mimics what an LLM planner would do.
+    # We use our variable substitution {step_0} etc to pass outputs to next steps.
+    plan = [
+        PlanStep(description="Step 1 data retrieval", tool="structured_query", tool_input={"query": "Q2 revenue"}),
+        PlanStep(description="Step 2 data retrieval", tool="structured_query", tool_input={"query": "Q3 revenue"}),
+        PlanStep(description="Calculate comparison", tool="calculator", tool_input={"expression": "({step_1} - {step_0}) / {step_0} * 100"})
+    ]
+    
     state = execute_plan(state, plan, registry)
     
     assert state.evaluation_state == EvaluationState.SUFFICIENT
     assert state.tool_calls == 3
     assert len(state.tool_results_list) == 3
+    
+    calc_result = state.tool_results_list[2]["output"]["result"]
+    assert calc_result == 50.0 # (1500 - 1000) / 1000 * 100 = 50.0
 
 def test_scenario_5_retrieval_refinement(monkeypatch):
     """Spec 27: Scenario 5 — Retrieval refinement"""

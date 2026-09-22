@@ -92,8 +92,8 @@ def test_vector_search_cannot_override_identity(monkeypatch):
     assert client.last_request.user_id == "real_user"
     assert client.last_request.tenant_id == "real_tenant"
 
-def test_vector_search_clamps_top_k(monkeypatch):
-    """Spec 11, 18: Vector Search clamps top_k <= MAX_TOP_K."""
+def test_vector_search_rejects_top_k(monkeypatch):
+    """Spec P1.1: Vector Search rejects invalid or excessively large top_k."""
     monkeypatch.setenv("PHASE6_BASE_URL", "http://localhost:8006")
     monkeypatch.setenv("INTERNAL_SERVICE_TOKEN", "secret-token")
     
@@ -107,14 +107,12 @@ def test_vector_search_clamps_top_k(monkeypatch):
     tool = VectorSearchTool(client=client)
     identity = Identity(user_id="u", tenant_id="t")
     
-    # Attempt to request 100 top_k
+    # Attempt to request 100 top_k (max is 20)
     input_data = {
         "query_text": "test",
         "top_k": 100
     }
     
     res = tool.execute(input_data, identity)
-    assert res.success is True
-    
-    # Config MAX_TOP_K default is 20
-    assert client.last_request.top_k <= 20
+    assert res.success is False
+    assert res.error == "TOOL_INPUT_INVALID"

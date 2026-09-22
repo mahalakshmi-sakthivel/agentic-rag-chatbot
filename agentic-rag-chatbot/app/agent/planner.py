@@ -32,11 +32,10 @@ class Planner:
                 PlanStep(description="Retrieve second item data", tool="vector_search", tool_input={"query_text": query})
             ]
         elif intent == Intent.MULTI_STEP:
-            return [
-                PlanStep(description="Step 1 data retrieval", tool="structured_query", tool_input={"query": query}),
-                PlanStep(description="Step 2 data retrieval", tool="structured_query", tool_input={"query": query}),
-                PlanStep(description="Calculate comparison", tool="calculator", tool_input={"expression": "0"})
-            ]
+            # Deterministic multi-step is unsafe without LLM planning.
+            # We require LLM planning to construct actual calculation expressions
+            # and pass validated outputs between steps. We should not fabricate it.
+            return []
         elif intent == Intent.CLARIFICATION_REQUIRED:
             return []
             

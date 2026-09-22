@@ -37,9 +37,7 @@ def test_planner_deterministic():
     assert plan[0].tool == "structured_query"
 
     multi_plan = planner.create_plan(Intent.MULTI_STEP, "Compare Q2 and Q3")
-    assert len(multi_plan) == 3
-    assert multi_plan[0].tool == "structured_query"
-    assert multi_plan[2].tool == "calculator"
+    assert len(multi_plan) == 0  # We prevent fabricated multi-step execution
 
 def test_plan_validator_limits():
     """Spec 9, 18: Plan validator (registered tools only, <= 8 steps)."""

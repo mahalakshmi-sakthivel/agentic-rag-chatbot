@@ -20,12 +20,15 @@ class VectorSearchTool(BaseTool):
             return ToolResult(success=False, error=ErrorCode.TOOL_INPUT_INVALID.value)
 
         # Force tenant_id and user_id from identity
-        # Clamp top_k
+        # Reject invalid top_k
         requested_top_k = input_data.get("top_k", 5)
         if not isinstance(requested_top_k, int):
-            requested_top_k = 5
+            return ToolResult(success=False, error=ErrorCode.TOOL_INPUT_INVALID.value)
         
-        top_k = min(requested_top_k, self.config.MAX_TOP_K)
+        if requested_top_k > self.config.MAX_TOP_K or requested_top_k < 1:
+            return ToolResult(success=False, error=ErrorCode.TOOL_INPUT_INVALID.value)
+            
+        top_k = requested_top_k
         
         document_ids = input_data.get("document_ids")
         if document_ids is not None and not isinstance(document_ids, list):

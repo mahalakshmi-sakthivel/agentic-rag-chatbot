@@ -31,6 +31,29 @@ def execute_plan(state: AgentState, plan: List[PlanStep], registry: ToolRegistry
         current_step = remaining_plan.pop(0)
         state.plan_steps += 1
         
+        import re
+        
+        def resolve_inputs(tool_input: dict, state: AgentState) -> dict:
+            resolved = {}
+            for k, v in tool_input.items():
+                if isinstance(v, str):
+                    def replace_match(match):
+                        step_idx = int(match.group(1))
+                        if step_idx < len(state.tool_results_list):
+                            res = state.tool_results_list[step_idx]["output"]
+                            if isinstance(res, dict) and "value" in res:
+                                return str(res["value"])
+                            elif isinstance(res, dict) and "results" in res and len(res["results"]) > 0:
+                                # For structured query mock
+                                return str(res["results"][0].get("value", res["results"][0]))
+                            return str(res)
+                        return match.group(0)
+                    resolved_v = re.sub(r"\{step_(\d+)\}", replace_match, v)
+                    resolved[k] = resolved_v
+                else:
+                    resolved[k] = v
+            return resolved
+
         # Identity enforcement (from state)
         tool_input = dict(current_step.tool_input)
         
@@ -43,7 +66,9 @@ def execute_plan(state: AgentState, plan: List[PlanStep], registry: ToolRegistry
             if "query_text" not in tool_input or not tool_input["query_text"]:
                 tool_input["query_text"] = state.refined_query or state.original_query
         
-        result = registry.execute_tool(current_step.tool, tool_input, state.identity)
+        resolved_input = resolve_inputs(tool_input, state)
+        
+        result = registry.execute_tool(current_step.tool, resolved_input, state.identity)
         
         # Evaluate
         eval_state = evaluate_result(current_step.tool, result, state)
