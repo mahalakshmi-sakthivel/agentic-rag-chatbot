@@ -5,13 +5,14 @@
 #include "authorization.hpp"
 
 #include <stdexcept>
+#include <algorithm>
 
 namespace auth {
 
-bool Authorization::has_permission(const IdentityContext& identity,
+bool Authorization::has_permission(const common::IdentityContext& identity,
                                    const std::string& permission) noexcept {
     // ── Fail closed — unauthenticated identity has no permissions ─────────────
-    if (!identity.is_valid()) return false;
+    if (!identity.authenticated) return false;
     if (permission.empty())   return false;
 
     // ── Derive permissions from roles ─────────────────────────────────────────
@@ -20,10 +21,10 @@ bool Authorization::has_permission(const IdentityContext& identity,
     return perms.count(permission) > 0;
 }
 
-bool Authorization::can_access_resource(const IdentityContext& identity,
+bool Authorization::can_access_resource(const common::IdentityContext& identity,
                                          const ResourceContext& resource) noexcept {
     // ── Fail closed ───────────────────────────────────────────────────────────
-    if (!identity.is_valid()) return false;
+    if (!identity.authenticated) return false;
 
     // ── Tenant scope check (cross-tenant access is always denied) ─────────────
     // If both have a tenant_id, they must match
@@ -39,7 +40,8 @@ bool Authorization::can_access_resource(const IdentityContext& identity,
     }
 
     // ── Admin can access resources within same tenant ─────────────────────────
-    if (identity.has_role(roles::ADMIN)) {
+    auto it = std::find(identity.roles.begin(), identity.roles.end(), roles::ADMIN);
+    if (it != identity.roles.end()) {
         // Admin within same tenant scope
         if (identity.tenant_id.empty() || identity.tenant_id == resource.owner_tenant_id) {
             return true;
@@ -52,17 +54,17 @@ bool Authorization::can_access_resource(const IdentityContext& identity,
     return false;
 }
 
-void Authorization::require_permission(const IdentityContext& identity,
+void Authorization::require_permission(const common::IdentityContext& identity,
                                        const std::string& permission) {
     if (!has_permission(identity, permission)) {
-        throw AuthException("FORBIDDEN: missing permission: " + permission, "PERMISSION_DENIED");
+        throw AuthException("PERMISSION_DENIED: missing permission: " + permission, "PERMISSION_DENIED");
     }
 }
 
-void Authorization::require_resource_access(const IdentityContext& identity,
+void Authorization::require_resource_access(const common::IdentityContext& identity,
                                             const ResourceContext& resource) {
     if (!can_access_resource(identity, resource)) {
-        throw AuthException("FORBIDDEN: resource access denied for user: " + identity.user_id, "PERMISSION_DENIED");
+        throw AuthException("PERMISSION_DENIED: resource access denied for user: " + identity.user_id, "PERMISSION_DENIED");
     }
 }
 

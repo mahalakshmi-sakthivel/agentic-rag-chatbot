@@ -12,7 +12,7 @@
  *   sessions: id, user_id, created_at, expires_at, status
  */
 
-#include "identity_context.hpp"
+#include "../common/identity.h"
 #include "db/database.hpp"
 
 #include <optional>

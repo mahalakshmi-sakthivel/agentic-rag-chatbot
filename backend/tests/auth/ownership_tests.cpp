@@ -17,19 +17,20 @@
 #include <catch2/catch.hpp>
 
 #include "auth/authorization.hpp"
-#include "auth/identity_context.hpp"
+#include "common/identity.h"   // Fix #3: correct IdentityContext include
 #include "auth/roles.hpp"
 
 using namespace auth;
 
-static IdentityContext make_user(const std::string& uid,
-                                  const std::string& tenant = "tenant-1",
-                                  const std::string& role   = "user") {
-    IdentityContext id;
-    id.user_id    = uid;
-    id.tenant_id  = tenant;
-    id.session_id = "s";
-    id.roles      = {role};
+static common::IdentityContext make_user(const std::string& uid,
+                                          const std::string& tenant = "tenant-1",
+                                          const std::string& role   = "user") {
+    common::IdentityContext id;
+    id.user_id       = uid;
+    id.tenant_id     = tenant;
+    id.session_id    = "s";
+    id.roles         = {role};
+    id.authenticated = true;
     return id;
 }
 
@@ -110,7 +111,7 @@ TEST_CASE("Ownership: admin can access resources in same tenant", "[ownership]")
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST_CASE("Ownership: unauthenticated identity cannot access any resource", "[ownership]") {
-    auto unauth   = IdentityContext::unauthenticated();
+    common::IdentityContext unauth;  // authenticated = false by default
     auto resource = make_resource("doc-101", "user-A");
     REQUIRE(Authorization::can_access_resource(unauth, resource) == false);
 }

@@ -26,8 +26,15 @@ std::string PasswordHasher::hash(const std::string& password, int work_factor) {
     }
 
     // NOTE: password is NOT logged here — intentional.
+    // Step 1: generate a random salt with the requested work factor
+    char salt[64] = {};
+    int salt_result = bcrypt_gensalt(work_factor, salt);
+    if (salt_result != 0) {
+        throw std::runtime_error("bcrypt salt generation failed");
+    }
+    // Step 2: hash the password with the generated salt
     char hash_buf[64] = {};
-    int result = bcrypt_hashpw(password.c_str(), nullptr, work_factor, hash_buf);
+    int result = bcrypt_hashpw(password.c_str(), salt, hash_buf);
     if (result != 0) {
         throw std::runtime_error("bcrypt hashing failed");
     }

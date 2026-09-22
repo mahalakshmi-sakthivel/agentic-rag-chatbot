@@ -27,7 +27,7 @@ struct SessionFixture {
     SessionManager mgr;
 
     SessionFixture() : mgr(db) {
-        db.run_migrations("../db/migrations");
+        db.run_migrations("db/migrations");
         // Create two test users directly in DB
         db.execute(
             "INSERT INTO users (id, email, password_hash, status) VALUES "

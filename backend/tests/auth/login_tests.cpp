@@ -19,7 +19,7 @@
 #include "auth/auth_service.hpp"
 #include "auth/password_hasher.hpp"
 #include "db/database.hpp"
-#include "config/auth_config.hpp"
+#include "../../config/auth_config.hpp"
 
 using namespace auth;
 
@@ -33,7 +33,7 @@ struct LoginFixture {
     AuthService service;
 
     LoginFixture() : service(db, make_config()) {
-        db.run_migrations("../db/migrations");
+        db.run_migrations("db/migrations");
     }
 
     static AuthConfig make_config() {
@@ -41,7 +41,7 @@ struct LoginFixture {
         c.jwt_secret           = "test_secret_at_least_32_characters_long_x";
         c.jwt_issuer           = "test-issuer";
         c.jwt_audience         = "test-audience";
-        c.token_expiry_seconds = 3600;
+        c.token_expiry_seconds = 86400;  // 24 hours — matches production default (§ auth_config.hpp)
         c.db_path              = ":memory:";
         return c;
     }

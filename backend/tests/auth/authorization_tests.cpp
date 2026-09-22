@@ -16,24 +16,30 @@
 #include <catch2/catch.hpp>
 
 #include "auth/authorization.hpp"
-#include "auth/identity_context.hpp"
+#include "common/identity.h"   // Fix #3: correct IdentityContext include
 #include "auth/roles.hpp"
 
 using namespace auth;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: build an IdentityContext
+// Helper: build an IdentityContext (common::IdentityContext, authenticated)
 // ─────────────────────────────────────────────────────────────────────────────
 
-static IdentityContext make_identity(const std::string& user_id,
-                                     const std::vector<std::string>& roles,
-                                     const std::string& tenant = "tenant-1") {
-    IdentityContext id;
-    id.user_id    = user_id;
-    id.tenant_id  = tenant;
-    id.session_id = "session-x";
-    id.roles      = roles;
+static common::IdentityContext make_identity(const std::string& user_id,
+                                             const std::vector<std::string>& roles,
+                                             const std::string& tenant = "tenant-1") {
+    common::IdentityContext id;
+    id.user_id       = user_id;
+    id.tenant_id     = tenant;
+    id.session_id    = "session-x";
+    id.roles         = roles;
+    id.authenticated = true;
     return id;
+}
+
+// Helper: unauthenticated identity
+static common::IdentityContext make_unauthenticated() {
+    return common::IdentityContext{};  // authenticated defaults to false
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -79,7 +85,7 @@ TEST_CASE("Authorization: admin can also use chatbot", "[authz]") {
 // ─────────────────────────────────────────────────────────────────────────────
 
 TEST_CASE("Authorization: unauthenticated identity is denied all permissions", "[authz]") {
-    auto id = IdentityContext::unauthenticated();
+    auto id = make_unauthenticated();
     REQUIRE(Authorization::has_permission(id, permissions::USE_CHATBOT)  == false);
     REQUIRE(Authorization::has_permission(id, permissions::LOGIN)        == false);
     REQUIRE(Authorization::has_permission(id, permissions::MANAGE_USERS) == false);

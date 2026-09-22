@@ -628,7 +628,15 @@ Validation
 IdentityContext
 ```
 
-A session record may conceptually contain:
+### 14.1 Session Store and Expiry Decisions
+
+**Decision 1: Session Persistence**
+Sessions are persisted using the Phase 1 SQLite database infrastructure (via `common::Database`). A dedicated `sessions` table maintains the active state, `last_active` timestamp, and tying the `session_id` back to the `user_id`. This allows explicit revocation of sessions across server restarts without relying on an external Redis/Memcached cache for simplicity.
+
+**Decision 2: Expiration**
+A session is valid for exactly 24 hours, completely aligning with the JWT's `exp` claim. When a JWT expires, the session naturally becomes inaccessible. We rely on the JWT expiry as the primary short-circuit evaluation, followed by a database lookup against the session table to ensure the session hasn't been explicitly logged out.
+
+A session record conceptually contains:
 
 ```text
 session_id

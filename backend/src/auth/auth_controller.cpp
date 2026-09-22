@@ -1,312 +1,124 @@
-/**
- * @file auth_controller.cpp
- *
- * REST handlers for the authentication API.
- * Uses Crow HTTP framework.
- *
- * All responses follow §19 status codes.
- * Error messages are generic — they do not reveal sensitive implementation details.
- */
-
 #include "auth_controller.hpp"
-#include "authorization.hpp"
-#include "roles.hpp"
-
-#include <crow.h>
-#include <stdexcept>
+#include "../api/controllers/response_helpers.h"
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 namespace auth {
 
-AuthController::AuthController(AuthService& auth_service,
-                               SessionManager& session_manager)
-    : auth_service_(auth_service)
-    , session_manager_(session_manager)
-{}
+std::shared_ptr<AuthService> AuthController::auth_service_;
+std::shared_ptr<SessionManager> AuthController::session_manager_;
 
-void AuthController::register_routes(crow::SimpleApp& app) {
-    // POST /auth/register
-    CROW_ROUTE(app, "/auth/register").methods(crow::HTTPMethod::POST)
-    ([this](const crow::request& req) {
-        return handle_register(req);
-    });
-
-    // POST /auth/login
-    CROW_ROUTE(app, "/auth/login").methods(crow::HTTPMethod::POST)
-    ([this](const crow::request& req) {
-        return handle_login(req);
-    });
-
-    // POST /auth/logout
-    CROW_ROUTE(app, "/auth/logout").methods(crow::HTTPMethod::POST)
-    ([this](const crow::request& req) {
-        return handle_logout(req);
-    });
-
-    // GET /auth/me
-    CROW_ROUTE(app, "/auth/me").methods(crow::HTTPMethod::GET)
-    ([this](const crow::request& req) {
-        return handle_me(req);
-    });
-
-    // GET /sessions
-    CROW_ROUTE(app, "/sessions").methods(crow::HTTPMethod::GET)
-    ([this](const crow::request& req) {
-        return handle_list_sessions(req);
-    });
-
-    // DELETE /sessions/{id}
-    CROW_ROUTE(app, "/sessions/<string>").methods(crow::HTTPMethod::DELETE)
-    ([this](const crow::request& req, const std::string& session_id) {
-        return handle_delete_session(req, session_id);
-    });
+void AuthController::init(std::shared_ptr<AuthService> auth_svc,
+                          std::shared_ptr<SessionManager> session_mgr) {
+  auth_service_ = std::move(auth_svc);
+  session_manager_ = std::move(session_mgr);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /auth/register
-// ─────────────────────────────────────────────────────────────────────────────
+void AuthController::login(
+    const drogon::HttpRequestPtr &req,
+    std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
 
-crow::response AuthController::handle_register(const crow::request& req) {
-    try {
-        auto body = crow::json::load(req.body);
-        if (!body || !body.has("email") || !body.has("password")) {
-            return error_response(400, "email and password are required");
-        }
+  try {
+    auto req_body = nlohmann::json::parse(req->getBody());
 
-        RegisterRequest reg_req;
-        reg_req.email     = body["email"].s();
-        reg_req.password  = body["password"].s();
-        if (body.has("tenant_id")) reg_req.tenant_id = body["tenant_id"].s();
+    LoginRequest login_req;
+    login_req.email = req_body.value("email", "");
+    login_req.password = req_body.value("password", "");
+    login_req.tenant_id = req_body.value("tenant_id", "");
 
-        // NOTE: password is NOT logged beyond this point
-        auto result = auth_service_.register_user(reg_req);
+    auto result = auth_service_->login(login_req);
 
-        if (!result.success) {
-            return error_response(400, result.message);
-        }
-
-        crow::json::wvalue resp;
-        resp["user_id"] = result.user_id;
-        resp["message"] = result.message;
-        return json_response(201, resp);
-
-    } catch (const std::exception& e) {
-        std::cerr << "[auth_controller] register error: " << e.what() << "\n";
-        return error_response(500, "Internal server error");
+    if (!result.success) {
+      callback(api::errorResponse(common::ErrorCode::UNAUTHENTICATED,
+                                  result.message));
+      return;
     }
+
+    // Login returns BOTH access token and refresh token.
+    nlohmann::json data = {{"access_token", result.access_token},
+                           {"refresh_token", result.refresh_token},
+                           {"token_type", result.token_type},
+                           {"expires_in", result.expires_in}};
+
+    callback(api::successResponse(data));
+
+  } catch (const std::exception &e) {
+    callback(api::errorResponse(common::ErrorCode::VALIDATION_ERROR,
+                                "Invalid JSON payload"));
+  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /auth/login
-// ─────────────────────────────────────────────────────────────────────────────
+void AuthController::refresh(
+    const drogon::HttpRequestPtr &req,
+    std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
 
-crow::response AuthController::handle_login(const crow::request& req) {
-    try {
-        auto body = crow::json::load(req.body);
-        if (!body || !body.has("email") || !body.has("password")) {
-            return error_response(400, "email and password are required");
-        }
+  try {
+    auto req_body = nlohmann::json::parse(req->getBody());
 
-        LoginRequest login_req;
-        login_req.email    = body["email"].s();
-        login_req.password = body["password"].s();
-        if (body.has("tenant_id")) login_req.tenant_id = body["tenant_id"].s();
+    // Refresh endpoint must receive the REFRESH TOKEN,
+    // not the normal access token.
+    if (!req_body.contains("refresh_token") ||
+        !req_body["refresh_token"].is_string()) {
 
-        auto result = auth_service_.login(login_req);
+      callback(api::errorResponse(common::ErrorCode::VALIDATION_ERROR,
+                                  "Missing refresh_token"));
 
-        if (!result.success) {
-            // Return 401 for invalid credentials — do NOT reveal reason
-            return error_response(401, result.message);
-        }
-
-        // NOTE: access_token is returned to client but NOT logged
-        crow::json::wvalue resp;
-        resp["access_token"] = result.access_token;
-        resp["token_type"]   = result.token_type;
-        resp["expires_in"]   = result.expires_in;
-        return json_response(200, resp);
-
-    } catch (const std::exception& e) {
-        std::cerr << "[auth_controller] login error: " << e.what() << "\n";
-        return error_response(500, "Internal server error");
+      return;
     }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /auth/logout
-// ─────────────────────────────────────────────────────────────────────────────
+    const std::string refresh_token =
+        req_body["refresh_token"].get<std::string>();
 
-crow::response AuthController::handle_logout(const crow::request& req) {
-    try {
-        auto identity = extract_identity(req);
-        if (!identity.is_valid()) {
-            return error_response(401, "Authentication required");
-        }
+    if (refresh_token.empty()) {
+      callback(api::errorResponse(common::ErrorCode::VALIDATION_ERROR,
+                                  "Missing refresh_token"));
 
-        auth_service_.logout(identity);
-
-        crow::json::wvalue resp;
-        resp["message"] = "Logged out successfully";
-        return json_response(200, resp);
-
-    } catch (const std::exception& e) {
-        std::cerr << "[auth_controller] logout error: " << e.what() << "\n";
-        return error_response(500, "Internal server error");
+      return;
     }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /auth/me
-// ─────────────────────────────────────────────────────────────────────────────
+    // AuthService validates the refresh token and generates
+    // a new access token.
+    auto result = auth_service_->refresh_token(refresh_token);
 
-crow::response AuthController::handle_me(const crow::request& req) {
-    try {
-        auto identity = extract_identity(req);
-        if (!identity.is_valid()) {
-            return error_response(401, "Authentication required");
-        }
+    if (!result.success) {
+      callback(api::errorResponse(common::ErrorCode::UNAUTHENTICATED,
+                                  result.message));
 
-        auto user = auth_service_.get_current_user(identity);
-        if (!user.has_value()) {
-            return error_response(404, "User not found");
-        }
-
-        crow::json::wvalue resp;
-        resp["user_id"]   = user->user_id;
-        resp["email"]     = user->email;
-        resp["tenant_id"] = user->tenant_id;
-        crow::json::wvalue::list roles_list;
-        for (const auto& r : user->roles) {
-            roles_list.push_back(r);
-        }
-        resp["roles"]     = std::move(roles_list);
-        // NOTE: password hash is NEVER included in this response
-        return json_response(200, resp);
-
-    } catch (const std::exception& e) {
-        std::cerr << "[auth_controller] me error: " << e.what() << "\n";
-        return error_response(500, "Internal server error");
+      return;
     }
+
+    nlohmann::json data = {{"access_token", result.access_token},
+                           {"token_type", result.token_type},
+                           {"expires_in", result.expires_in}};
+
+    callback(api::successResponse(data));
+
+  } catch (const std::exception &e) {
+    callback(api::errorResponse(common::ErrorCode::VALIDATION_ERROR,
+                                "Invalid JSON payload"));
+  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /sessions
-// ─────────────────────────────────────────────────────────────────────────────
+void AuthController::logout(
+    const drogon::HttpRequestPtr &req,
+    std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
 
-crow::response AuthController::handle_list_sessions(const crow::request& req) {
-    try {
-        auto identity = extract_identity(req);
-        if (!identity.is_valid()) {
-            return error_response(401, "Authentication required");
-        }
+  auto identity = common::authenticate(req);
 
-        // Authorization: users can only list their own sessions
-        Authorization::require_permission(identity, permissions::VIEW_OWN_SESSIONS);
+  if (!identity.authenticated) {
+    callback(api::errorResponse(common::ErrorCode::UNAUTHENTICATED,
+                                "Missing or invalid token"));
+    return;
+  }
 
-        auto sessions = session_manager_.list_sessions(identity.user_id);
+  bool success = auth_service_->logout(identity);
 
-        crow::json::wvalue resp;
-        crow::json::wvalue::list session_list;
-        for (const auto& s : sessions) {
-            crow::json::wvalue entry;
-            entry["id"]      = s.id;
-            entry["status"]  = (s.status == SessionStatus::ACTIVE)   ? "active"   :
-                               (s.status == SessionStatus::REVOKED)  ? "revoked"  : "expired";
-            session_list.push_back(std::move(entry));
-        }
-        resp["sessions"] = std::move(session_list);
-        return json_response(200, resp);
-
-    } catch (const AuthException& e) {
-        return error_response(403, e.what());
-    } catch (const std::exception& e) {
-        std::cerr << "[auth_controller] list_sessions error: " << e.what() << "\n";
-        return error_response(500, "Internal server error");
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DELETE /sessions/{id}
-// ─────────────────────────────────────────────────────────────────────────────
-
-crow::response AuthController::handle_delete_session(const crow::request& req,
-                                                      const std::string& session_id) {
-    try {
-        auto identity = extract_identity(req);
-        if (!identity.is_valid()) {
-            return error_response(401, "Authentication required");
-        }
-
-        Authorization::require_permission(identity, permissions::DELETE_OWN_SESSION);
-
-        // Ownership is enforced inside delete_session — user can only delete own sessions
-        bool deleted = session_manager_.delete_session(session_id, identity.user_id);
-        if (!deleted) {
-            return error_response(404, "Session not found");
-        }
-
-        crow::json::wvalue resp;
-        resp["message"] = "Session deleted";
-        return json_response(200, resp);
-
-    } catch (const AuthException& e) {
-        return error_response(403, e.what());
-    } catch (const std::exception& e) {
-        std::cerr << "[auth_controller] delete_session error: " << e.what() << "\n";
-        return error_response(500, "Internal server error");
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Private helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-IdentityContext AuthController::extract_identity(const crow::request& req) {
-    // The identity was attached by AuthenticationMiddleware
-    // In Crow, middleware stores context in the request context map
-    // Retrieve the pre-validated identity — do NOT validate the token here again
-    auto* ctx = req.get_header_value("X-Identity-User-Id");
-    if (!ctx || std::string(ctx).empty()) {
-        return IdentityContext::unauthenticated();
-    }
-    // Identity was set by middleware
-    IdentityContext identity;
-    identity.user_id    = req.get_header_value("X-Identity-User-Id");
-    identity.tenant_id  = req.get_header_value("X-Identity-Tenant-Id");
-    identity.session_id = req.get_header_value("X-Identity-Session-Id");
-
-    std::string roles_str = req.get_header_value("X-Identity-Roles");
-    std::istringstream ss(roles_str);
-    std::string role;
-    while (std::getline(ss, role, ',')) {
-        if (!role.empty()) identity.roles.push_back(role);
-    }
-    return identity;
-}
-
-crow::response AuthController::error_response(int status, const std::string& message) {
-    std::string code = "INTERNAL_ERROR";
-    if (status == 400) code = "VALIDATION_ERROR";
-    else if (status == 401) code = "UNAUTHENTICATED";
-    else if (status == 403) code = "PERMISSION_DENIED";
-    else if (status == 404) code = "NOT_FOUND";
-    else if (status == 413) code = "FILE_TOO_LARGE";
-    else if (status == 415) code = "UNSUPPORTED_FILE_TYPE";
-    else if (status == 429) code = "RATE_LIMITED";
-    
-    crow::json::wvalue body;
-    body["code"]   = code;
-    body["error"]  = message;
-    body["status"] = status;
-    auto resp = crow::response(status, body.dump());
-    resp.set_header("Content-Type", "application/json");
-    return resp;
-}
-
-crow::response AuthController::json_response(int status, const crow::json::wvalue& body) {
-    auto resp = crow::response(status, body.dump());
-    resp.set_header("Content-Type", "application/json");
-    return resp;
+  if (success) {
+    callback(api::successResponse(nlohmann::json::object()));
+  } else {
+    callback(
+        api::errorResponse(common::ErrorCode::INTERNAL_ERROR, "Logout failed"));
+  }
 }
 
 } // namespace auth

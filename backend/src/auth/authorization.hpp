@@ -12,7 +12,7 @@
  * Fail closed: missing/unknown permissions → DENIED.
  */
 
-#include "identity_context.hpp"
+#include "../common/identity.h"
 #include "roles.hpp"
 
 #include <string>
@@ -60,7 +60,7 @@ public:
      * @param permission  One of the permissions:: constants.
      * @return true if allowed, false if denied (fail closed).
      */
-    static bool has_permission(const IdentityContext& identity,
+    static bool has_permission(const common::IdentityContext& identity,
                                const std::string& permission) noexcept;
 
     /**
@@ -76,7 +76,7 @@ public:
      * @param resource  Resource descriptor with verified owner information.
      * @return true if access is allowed, false otherwise.
      */
-    static bool can_access_resource(const IdentityContext& identity,
+    static bool can_access_resource(const common::IdentityContext& identity,
                                     const ResourceContext& resource) noexcept;
 
     /**
@@ -85,13 +85,13 @@ public:
      * Use in handlers where you want an exception instead of a bool.
      * The middleware will catch this and return HTTP 403.
      */
-    static void require_permission(const IdentityContext& identity,
+    static void require_permission(const common::IdentityContext& identity,
                                    const std::string& permission);
 
     /**
      * @brief Require resource access — throws std::runtime_error if denied.
      */
-    static void require_resource_access(const IdentityContext& identity,
+    static void require_resource_access(const common::IdentityContext& identity,
                                         const ResourceContext& resource);
 
 private:

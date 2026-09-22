@@ -1,0 +1,6 @@
+backend/build/
+*.zip
+phase2_changes/
+.env
+vcpkg_installed/
+.vscode/

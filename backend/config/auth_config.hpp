@@ -10,7 +10,7 @@
  *   JWT_SECRET           – HMAC-SHA256 signing secret (min 32 chars)
  *   JWT_ISSUER           – Token issuer claim (e.g., "agentic-rag-chatbot")
  *   JWT_AUDIENCE         – Token audience claim (e.g., "chatbot-api")
- *   TOKEN_EXPIRY_SECONDS – Access-token lifetime in seconds (default: 3600)
+ *   TOKEN_EXPIRY_SECONDS – Access-token lifetime in seconds (default: 86400 = 24 hours)
  *   DB_PATH              – Path to SQLite database file
  */
 
@@ -24,7 +24,7 @@ struct AuthConfig {
     std::string jwt_secret;
     std::string jwt_issuer;
     std::string jwt_audience;
-    int         token_expiry_seconds{3600};
+    int         token_expiry_seconds{86400};
     std::string db_path;
 
     /**

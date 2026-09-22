@@ -1,98 +1,104 @@
-/**
- * @file main.cpp
- * @brief Server entrypoint — wires auth layer into Crow HTTP server.
- *
- * Loads config from environment variables.
- * Runs DB migrations.
- * Registers authentication/authorization middleware and routes.
- */
+// main.cpp
+//
+// Phase 1 entry point. Loads AppConfig from the environment, registers the
+// three Phase 1 routes, and starts Drogon. Deliberately thin — all real
+// logic lives in api/controllers/*.
+//
+#include "api/router.h"
+#include "common/config.h"
+#include "common/identity.h"
 
-#include <crow.h>
-#include <iostream>
-#include <stdexcept>
-
-#include "config/auth_config.hpp"
+// Phase 2 Modules
+#include "auth_config.hpp"
 #include "db/database.hpp"
 #include "auth/auth_service.hpp"
-#include "auth/auth_controller.hpp"
 #include "auth/session_manager.hpp"
-#include "middleware/authentication_middleware.hpp"
-#include "middleware/authorization_middleware.hpp"
+#include "auth/token_service.hpp"
+#include "auth/jwt_verifier.hpp"
+#include "auth/auth_controller.hpp"
 
-int main() {
-    // ── Load configuration from environment ───────────────────────────────────
-    auth::AuthConfig cfg;
+#include <drogon/drogon.h>
+#include <cstdlib>
+#include <iostream>
+#include <thread>
+
+namespace
+{
+
+trantor::Logger::LogLevel parseLogLevel(const std::string &level)
+{
+    if (level == "debug") return trantor::Logger::kDebug;
+    if (level == "warn") return trantor::Logger::kWarn;
+    if (level == "error") return trantor::Logger::kError;
+    return trantor::Logger::kInfo;
+}
+
+} // namespace
+
+int main()
+{
+    const common::AppConfig config = common::AppConfig::fromEnvironment();
+
+    trantor::Logger::setLogLevel(parseLogLevel(config.logLevel));
+
+    LOG_INFO << "Starting agentic-rag-backend (Phase 1) "
+             << "env=" << config.environment
+             << " port=" << config.backendPort
+             << " storage=" << config.fileStoragePath
+             << " max_upload_mb=" << (config.maxUploadSizeBytes / (1024 * 1024))
+             << " auth_dev_bypass=" << (config.authDevBypassEnabled ? "true" : "false");
+
+    if (config.authDevBypassEnabled && config.environment != "development")
+    {
+        LOG_WARN << "AUTH_DEV_BYPASS is true in a non-development environment "
+                    "(ENVIRONMENT=" << config.environment << "). This must be "
+                    "false outside local dev (Section 19.1) — fix before deploying.";
+    }
+
+    // ---------------------------------------------------------------------
+    // PHASE 2 INTEGRATION POINT
+    // ---------------------------------------------------------------------
+    auth::AuthConfig auth_cfg;
     try {
-        cfg = auth::AuthConfig::from_env();
+        auth_cfg = auth::AuthConfig::from_env();
     } catch (const std::exception& e) {
-        std::cerr << "[startup] Configuration error: " << e.what() << "\n"
-                  << "[startup] Copy .env.example to .env and set all required variables.\n";
+        LOG_ERROR << "Auth configuration error: " << e.what();
         return 1;
     }
 
-    // ── Open database and run migrations ─────────────────────────────────────
-    auth::Database db(cfg.db_path);
+    auto db = std::make_shared<auth::Database>(auth_cfg.db_path);
     try {
-        db.run_migrations("db/migrations");
-        std::cout << "[startup] Migrations complete.\n";
+        db->run_migrations("db/migrations");
     } catch (const std::exception& e) {
-        std::cerr << "[startup] Migration error: " << e.what() << "\n";
+        LOG_ERROR << "Migration error: " << e.what();
         return 1;
     }
 
-    // ── Construct services ────────────────────────────────────────────────────
-    auth::AuthService    auth_svc(db, cfg);
-    auth::SessionManager session_mgr(db);
-    auth::TokenService   token_svc(cfg);
+    auto auth_svc = std::make_shared<auth::AuthService>(*db, auth_cfg);
+    auto session_mgr = std::make_shared<auth::SessionManager>(*db);
+    auto token_svc = std::make_shared<auth::TokenService>(auth_cfg);
 
-    // ── Construct middleware ──────────────────────────────────────────────────
-    auth::middleware::AuthenticationMiddleware auth_middleware(token_svc, session_mgr);
-
-    // ── Construct controller ──────────────────────────────────────────────────
-    auth::AuthController controller(auth_svc, session_mgr);
-
-    // ── Set up Crow app ───────────────────────────────────────────────────────
-    crow::SimpleApp app;
-
-    // Health check (public endpoint)
-    CROW_ROUTE(app, "/health").methods(crow::HTTPMethod::GET)
-    ([]() {
-        crow::json::wvalue resp;
-        resp["status"] = "ok";
-        return crow::response(200, resp.dump());
+    // Initialize the token verifier
+    auto jwt_verifier = std::make_shared<auth::JwtVerifier>(token_svc, session_mgr);
+    common::setTokenVerifier([jwt_verifier](const drogon::HttpRequestPtr& req) {
+        return jwt_verifier->verify(req);
     });
 
-    // Register auth routes (POST /auth/register, POST /auth/login, etc.)
-    controller.register_routes(app);
+    // Initialize AuthController dependencies
+    auth::AuthController::init(auth_svc, session_mgr);
+    
+    auto &app = drogon::app();
+    api::registerRoutes(app, config);
 
-    // Example protected route — shows how Phase 1 handlers use the middleware
-    CROW_ROUTE(app, "/api/protected").methods(crow::HTTPMethod::GET)
-    ([&auth_middleware](crow::request& req, crow::response& res) {
-        // ── Authentication middleware ──────────────────────────────────────
-        if (!auth_middleware.authenticate(req, res)) {
-            res.end(); // 401 already set
-            return;
-        }
-        // ── Handler logic ─────────────────────────────────────────────────
-        std::string user_id = req.get_header_value("X-Identity-User-Id");
-        crow::json::wvalue body;
-        body["message"] = "Protected resource accessed";
-        body["user_id"] = user_id;
-        res = crow::response(200, body.dump());
-        res.set_header("Content-Type", "application/json");
-        res.end();
-    });
+    app.addListener("0.0.0.0", config.backendPort);
 
-    // ── Start server ──────────────────────────────────────────────────────────
-    const char* host = std::getenv("SERVER_HOST");
-    const char* port = std::getenv("SERVER_PORT");
-    uint16_t server_port = port ? static_cast<uint16_t>(std::stoi(port)) : 8080;
+    // Section 12: async-capable framework, single I/O loop is sufficient for
+    // Phase 1's stub workload — revisit thread count once Phase 4/5/6 add
+    // real retrieval/LLM latency.
+    app.setThreadNum(std::thread::hardware_concurrency() > 0
+                          ? std::thread::hardware_concurrency()
+                          : 2);
 
-    std::cout << "[startup] Server starting on port " << server_port << "\n";
-    app.bindaddr(host ? host : "0.0.0.0")
-       .port(server_port)
-       .multithreaded()
-       .run();
-
+    app.run();
     return 0;
 }
