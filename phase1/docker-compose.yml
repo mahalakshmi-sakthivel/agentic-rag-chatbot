@@ -1,0 +1,33 @@
+# Optional convenience wrapper around `docker build`/`docker run` for
+# Phase 1 (see backend/README.md "Docker" for the equivalent plain-Docker
+# commands, and DOCKER_VERIFICATION.md for the verification transcript).
+#
+# Usage:
+#   cp .env.example .env   # edit if needed
+#   docker compose up --build
+
+services:
+  phase1-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      # Local/dev convenience only — same discipline as backend/README.md
+      # "Authentication": must stay false outside local dev (Section 19.1).
+      AUTH_DEV_BYPASS: "${AUTH_DEV_BYPASS:-false}"
+      ENVIRONMENT: "${ENVIRONMENT:-production}"
+    volumes:
+      - phase1-storage:/app/storage/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/v1/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+volumes:
+  phase1-storage:

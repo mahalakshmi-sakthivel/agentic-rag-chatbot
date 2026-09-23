@@ -1,0 +1,16 @@
+{
+  "name": "plug-and-play-agentic-rag-backend",
+  "version": "0.1.0",
+  "builtin-baseline": "386d7c478221b7ee0c97bfe6ea61dcf65121d564",
+  "dependencies": [
+    "drogon",
+    "nlohmann-json",
+    "gtest"
+  ],
+  "overrides": [
+    {
+      "name": "drogon",
+      "version": "1.8.7"
+    }
+  ]
+}
