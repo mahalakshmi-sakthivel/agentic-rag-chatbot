@@ -8,7 +8,7 @@ def test_agent_run_stub():
     """Spec 19 / Inbound Interface: Test the basic Agent.run signature and AgentResult shape."""
     registry = ToolRegistry()
     agent = Agent(registry=registry)
-    identity = Identity(user_id="user1", tenant_id="tenant1")
+    identity = Identity(user_id="user1", tenant_id="tenant1", roles=["user"], session_id="s1")
     request = AgentRequest(query="test", identity=identity)
     
     result = agent.run(request)

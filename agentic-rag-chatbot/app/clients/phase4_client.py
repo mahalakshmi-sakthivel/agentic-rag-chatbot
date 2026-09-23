@@ -5,6 +5,8 @@ class Phase4Request(BaseModel):
     query_text: str
     tenant_id: str
     user_id: str
+    roles: List[str]
+    session_id: str
     document_ids: Optional[List[str]] = None
     top_k: int = 5
     filters: Optional[Dict[str, Any]] = None

@@ -15,7 +15,7 @@ def setup_teardown():
 def get_valid_context():
     return OrchestratorContext(
         query_id="test-query-id",
-        identity=Identity(user_id="u1", tenant_id="t1"),
+        identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"),
         original_query="test",
         retrieved_chunks=[Chunk(chunk_id="1", document_id="1", text="text", score=0.9, source_location="1", filename="1.pdf")]
     )
@@ -122,7 +122,7 @@ def test_scenario_7_handoff_failure(monkeypatch, httpx_mock):
     }
     httpx_mock.add_response(status_code=504, json=mock_resp)
     
-    request = AgentRequest(query="test", identity=Identity(user_id="u1", tenant_id="t1"), query_id="my-query-id")
+    request = AgentRequest(query="test", identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"), query_id="my-query-id")
     result = agent.run(request)
     
     # Contract-compatible failure returned upward (query_id preserved)

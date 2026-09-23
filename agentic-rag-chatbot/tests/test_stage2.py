@@ -8,7 +8,7 @@ from app.schemas.models import Identity, ToolResult
 def test_unknown_tool_rejected():
     """Spec 10: Unknown tools must be rejected."""
     registry = ToolRegistry()
-    identity = Identity(user_id="u1", tenant_id="t1")
+    identity = Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1")
     res = registry.execute_tool("nonexistent", {"some": "data"}, identity)
     assert res.success is False
     assert res.error == "TOOL_NOT_FOUND"
@@ -16,7 +16,7 @@ def test_unknown_tool_rejected():
 def test_calculator_works():
     """Spec 13: Calculator tool works with allowed expressions."""
     calc = CalculatorTool()
-    identity = Identity(user_id="u1", tenant_id="t1")
+    identity = Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1")
     
     # Normal math
     res = calc.execute({"expression": "(1250000 - 1000000) / 1000000 * 100"}, identity)
@@ -31,7 +31,7 @@ def test_calculator_works():
 def test_calculator_rejections():
     """Spec 13: Calculator tool rejects system(), exec(), imports, and huge exponents safely."""
     calc = CalculatorTool()
-    identity = Identity(user_id="u1", tenant_id="t1")
+    identity = Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1")
     
     # 'import os' is not an expression
     res = calc.execute({"expression": "import os"}, identity)
@@ -75,7 +75,7 @@ def test_vector_search_cannot_override_identity(monkeypatch):
 
     client = SpyingMockClient()
     tool = VectorSearchTool(client=client)
-    identity = Identity(user_id="real_user", tenant_id="real_tenant")
+    identity = Identity(user_id="real_user", tenant_id="real_tenant", roles=["user"], session_id="s1")
     
     # Malicious input trying to override identity
     input_data = {
@@ -105,7 +105,7 @@ def test_vector_search_rejects_top_k(monkeypatch):
 
     client = SpyingMockClient()
     tool = VectorSearchTool(client=client)
-    identity = Identity(user_id="u", tenant_id="t")
+    identity = Identity(user_id="u", tenant_id="t", roles=["user"], session_id="s1")
     
     # Attempt to request 100 top_k (max is 20)
     input_data = {

@@ -14,7 +14,7 @@ def test_handoff_gate_no_call_on_clarification_or_empty(monkeypatch, httpx_mock)
     agent = Agent(registry)
     
     # 1. Clarification (no call)
-    req1 = AgentRequest(query="What was the revenue?", identity=Identity(user_id="u1", tenant_id="t1"))
+    req1 = AgentRequest(query="What was the revenue?", identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"))
     res1 = agent.run(req1)
     assert isinstance(res1, ClarificationResponse)
     assert len(httpx_mock.get_requests()) == 0
@@ -32,7 +32,7 @@ def test_handoff_gate_no_call_on_clarification_or_empty(monkeypatch, httpx_mock)
     registry.register(VectorSearchTool(EmptyPhase4Client()))
     agent = Agent(registry)
     
-    req2 = AgentRequest(query="find empty things", identity=Identity(user_id="u1", tenant_id="t1"))
+    req2 = AgentRequest(query="find empty things", identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"))
     res2 = agent.run(req2)
     assert isinstance(res2, FailureResponse)
     assert res2.error_code == ErrorCode.INSUFFICIENT_CONTEXT

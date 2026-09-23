@@ -28,7 +28,7 @@ def test_real_phase4_client_success(httpx_mock):
     )
     
     client = RealPhase4Client()
-    req = Phase4Request(query_text="q", tenant_id="t1", user_id="u1", top_k=5)
+    req = Phase4Request(query_text="q", tenant_id="t1", user_id="u1", roles=["user"], session_id="s1", top_k=5)
     resp = client.search(req)
     
     assert len(resp.results) == 1
@@ -43,7 +43,7 @@ def test_real_phase4_client_timeout(httpx_mock):
     httpx_mock.add_exception(httpx.ReadTimeout("Timeout"), url="http://localhost:8004/v1/retrieval/search")
     
     client = RealPhase4Client()
-    req = Phase4Request(query_text="q", tenant_id="t1", user_id="u1", top_k=5)
+    req = Phase4Request(query_text="q", tenant_id="t1", user_id="u1", roles=["user"], session_id="s1", top_k=5)
     
     with pytest.raises(Phase4HandoffError) as exc:
         client.search(req)
@@ -54,7 +54,7 @@ def test_real_phase4_client_error(httpx_mock):
     httpx_mock.add_response(url="http://localhost:8004/v1/retrieval/search", status_code=401)
     
     client = RealPhase4Client()
-    req = Phase4Request(query_text="q", tenant_id="t1", user_id="u1", top_k=5)
+    req = Phase4Request(query_text="q", tenant_id="t1", user_id="u1", roles=["user"], session_id="s1", top_k=5)
     with pytest.raises(Phase4HandoffError) as exc:
         client.search(req)
     assert exc.value.code == ErrorCode.UNAUTHENTICATED
@@ -88,7 +88,7 @@ def test_real_phase6_client_success(httpx_mock):
     
     ctx = OrchestratorContext(
         query_id="q1",
-        identity=Identity(user_id="u1", tenant_id="t1"),
+        identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"),
         original_query="q",
         retrieved_chunks=[]
     )
@@ -129,7 +129,7 @@ def test_real_phase6_retry(httpx_mock):
     
     ctx = OrchestratorContext(
         query_id="q1",
-        identity=Identity(user_id="u1", tenant_id="t1"),
+        identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"),
         original_query="q",
         retrieved_chunks=[]
     )
@@ -143,7 +143,7 @@ def test_real_phase6_timeout(httpx_mock):
     httpx_mock.add_exception(httpx.ReadTimeout("Timeout"))
     ctx = OrchestratorContext(
         query_id="q1",
-        identity=Identity(user_id="u1", tenant_id="t1"),
+        identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"),
         original_query="q",
         retrieved_chunks=[]
     )
@@ -163,7 +163,7 @@ def test_real_phase6_malformed_response(httpx_mock):
     
     ctx = OrchestratorContext(
         query_id="q1",
-        identity=Identity(user_id="u1", tenant_id="t1"),
+        identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"),
         original_query="q",
         retrieved_chunks=[]
     )

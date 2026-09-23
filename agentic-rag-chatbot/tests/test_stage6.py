@@ -53,7 +53,7 @@ def test_agent_run_emits_summary_log(monkeypatch, caplog):
     registry.register(VectorSearchTool(MockPhase4Client()))
     agent = Agent(registry)
     
-    req = AgentRequest(query="What was the revenue?", identity=Identity(user_id="u", tenant_id="t"), query_id="q-clarify")
+    req = AgentRequest(query="What was the revenue?", identity=Identity(user_id="u", tenant_id="t", roles=["user"], session_id="s1"), query_id="q-clarify")
     
     # We use caplog to capture the standard python logging
     caplog.set_level(logging.INFO)

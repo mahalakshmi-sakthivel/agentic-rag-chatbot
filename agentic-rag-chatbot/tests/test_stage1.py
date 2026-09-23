@@ -10,13 +10,13 @@ from app.config import Config, get_config
 
 def test_identity_frozen():
     """Spec 19: Identity (frozen)"""
-    identity = Identity(user_id="user_123", tenant_id="tenant_456")
+    identity = Identity(user_id="user_123", tenant_id="tenant_456", roles=["user"], session_id="s1")
     with pytest.raises(ValidationError):
         identity.user_id = "new_user"
 
 def test_orchestrator_context_required_fields():
     """Spec 19: OrchestratorContext required and optional fields exactly as spec 19"""
-    identity = Identity(user_id="user_123", tenant_id="tenant_456")
+    identity = Identity(user_id="user_123", tenant_id="tenant_456", roles=["user"], session_id="s1")
     
     # Missing required fields
     with pytest.raises(ValidationError):
@@ -39,7 +39,7 @@ def test_orchestrator_context_required_fields():
 
 def test_orchestrator_context_reject_unknown_fields():
     """Spec 19: reject unknown fields"""
-    identity = Identity(user_id="user_123", tenant_id="tenant_456")
+    identity = Identity(user_id="user_123", tenant_id="tenant_456", roles=["user"], session_id="s1")
     
     with pytest.raises(ValidationError) as exc:
         OrchestratorContext(

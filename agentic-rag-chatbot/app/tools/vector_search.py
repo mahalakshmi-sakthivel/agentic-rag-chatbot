@@ -42,6 +42,8 @@ class VectorSearchTool(BaseTool):
             query_text=query_text,
             tenant_id=identity_context.tenant_id,
             user_id=identity_context.user_id,
+            roles=identity_context.roles,
+            session_id=identity_context.session_id,
             document_ids=document_ids,
             top_k=top_k,
             filters=filters

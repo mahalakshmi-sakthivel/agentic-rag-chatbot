@@ -26,7 +26,7 @@ def setup_registry():
 def get_base_state(query: str):
     return AgentState(
         query_id="q123",
-        identity=Identity(user_id="u1", tenant_id="t1"),
+        identity=Identity(user_id="u1", tenant_id="t1", roles=["user"], session_id="s1"),
         original_query=query,
         intent=detect_intent(query)
     )

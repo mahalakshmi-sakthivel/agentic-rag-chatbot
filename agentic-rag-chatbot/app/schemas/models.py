@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional, Any, Dict
 from enum import Enum
 
@@ -43,6 +43,17 @@ class Identity(BaseModel):
     model_config = ConfigDict(frozen=True)
     user_id: str
     tenant_id: str
+    roles: List[str]
+    session_id: str
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, roles_list):
+        allowed = {"user", "admin"}
+        for r in roles_list:
+            if r not in allowed:
+                raise ValueError(f"Invalid role '{r}'. Only 'user' and 'admin' are allowed.")
+        return roles_list
 
 class Chunk(BaseModel):
     chunk_id: str
