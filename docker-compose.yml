@@ -1,0 +1,29 @@
+# Phase 6 standalone compose file. Phase 5 reaches this service at
+# http://localhost:8006 by default (matches Phase 5's PHASE6_BASE_URL
+# default in its own .env.example) — keep the published port at 8006
+# unless PHASE6_BASE_URL is also updated on the Phase 5 side.
+services:
+  phase6:
+    build: .
+    ports:
+      - "8006:8006"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-to-a-random-secret}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL_NAME: ${LLM_MODEL_NAME:-qwen3:8b}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-8000}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.2}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-500}
+      MAX_CONTEXT_TOKENS: ${MAX_CONTEXT_TOKENS:-6000}
+      MAX_CHUNKS_IN_PROMPT: ${MAX_CHUNKS_IN_PROMPT:-20}
+      MIN_CITATION_COVERAGE: ${MIN_CITATION_COVERAGE:-0.6}
+      ALLOW_REGENERATION: ${ALLOW_REGENERATION:-true}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

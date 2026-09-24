@@ -1,0 +1,1 @@
+IMPORTANT — your previous answer failed validation because one or more sentences were not adequately supported by cited context. Regenerate your answer. Every sentence must cite a real chunk_id from the context, or be omitted entirely. If you cannot support a claim with a citation, remove the claim rather than leaving it uncited.
